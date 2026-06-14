@@ -3,3 +3,9 @@ __pycache__/
 .DS_Store
 *.egg-info/
 .env
+
+# NHGIS data — redistribution prohibited by terms of use
+# See README.md for how to obtain from https://www.nhgis.org/
+data/nhgis_historical_state_panel_1790_1990.csv
+data/national_decade_data.csv
+nhgis_cache/
