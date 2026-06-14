@@ -1,0 +1,7 @@
+year,geo,dataset,total_variable,black_alone_variable,aian_alone_variable,query_template
+2000,us,dec/sf1,P001001,P003003,P003004,"https://api.census.gov/data/2000/dec/sf1?get=NAME,P001001,P003003,P003004&for=us:1&key=YOUR_KEY"
+2000,state,dec/sf1,P001001,P003003,P003004,"https://api.census.gov/data/2000/dec/sf1?get=NAME,P001001,P003003,P003004&for=state:*&key=YOUR_KEY"
+2010,us,dec/sf1,P001001,P003003,P003004,"https://api.census.gov/data/2010/dec/sf1?get=NAME,P001001,P003003,P003004&for=us:1&key=YOUR_KEY"
+2010,state,dec/sf1,P001001,P003003,P003004,"https://api.census.gov/data/2010/dec/sf1?get=NAME,P001001,P003003,P003004&for=state:*&key=YOUR_KEY"
+2020,us,dec/pl,P1_001N,P1_004N,P1_005N,"https://api.census.gov/data/2020/dec/pl?get=NAME,P1_001N,P1_004N,P1_005N&for=us:1&key=YOUR_KEY"
+2020,state,dec/pl,P1_001N,P1_004N,P1_005N,"https://api.census.gov/data/2020/dec/pl?get=NAME,P1_001N,P1_004N,P1_005N&for=state:*&key=YOUR_KEY"

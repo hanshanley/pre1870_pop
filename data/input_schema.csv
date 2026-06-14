@@ -1,0 +1,13 @@
+file,column,description
+data/modern_census_state_race_2000_2020.csv,year,"Decennial census year: 2000, 2010, 2020"
+data/modern_census_state_race_2000_2020.csv,total_population,Total state population from decennial census API
+data/modern_census_state_race_2000_2020.csv,black_alone,Black or African American alone count
+data/modern_census_state_race_2000_2020.csv,aian_alone,American Indian and Alaska Native alone count
+data/nhgis_historical_state_panel_1790_1990.csv,year,Decennial census year
+data/nhgis_historical_state_panel_1790_1990.csv,state,State name
+data/nhgis_historical_state_panel_1790_1990.csv,abbr,State abbreviation
+data/nhgis_historical_state_panel_1790_1990.csv,total,Total state population
+data/nhgis_historical_state_panel_1790_1990.csv,black,"Black population count, harmonized to source availability"
+data/nhgis_historical_state_panel_1790_1990.csv,aian,American Indian / Alaska Native count or correction estimate
+data/nhgis_historical_state_panel_1790_1990.csv,foreign_born,Foreign-born count where available
+data/nhgis_historical_state_panel_1790_1990.csv,native_parentage,Native-born of native parentage or equivalent where available
