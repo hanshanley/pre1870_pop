@@ -4,36 +4,71 @@ This package estimates what share of each U.S. state's current population descen
 
 The model is a counterfactual apportionment exercise. It does not predict how anyone would vote.
 
+## Key outputs
+
+### Share of Americans with pre-1870 non-Black ancestry, 1870-2020
+
+![National old-stock share over time](outputs/pct_old_stock_over_time.png)
+
+### U.S. population by old-stock ancestry status
+
+![Raw headcount](outputs/raw_headcount_old_stock.png)
+
+### State-level old-stock ancestry share (agent-based model)
+
+![State map](outputs/map_old_stock_pct_by_state.png)
+
+### Hypothetical Electoral College reapportionment
+
+![EC cartogram](outputs/map_hypothetical_ec_2024_cartogram.png)
+
+## Two state-level models
+
+The project implements two independent approaches to state-level estimation:
+
+**Method A — Reduced-form model** (`state_pre1870_ancestry_model.py`): Uses ACS foreign-born and Black-alone shares with calibration to national anchors. Fast but relies on hand-set `old_stock_factor` priors per state.
+
+**Method B — Agent-based simulation** (`state_agent_ancestry_model.py`): Runs 300K agents through 1870-2020 using historical Census data from NHGIS (population, race, and nativity by state per decade). State differences emerge from the simulation — no hand-set factors.
+
+The notebook runs both and compares results.
+
+## Data sources
+
+All model inputs are loaded from CSV files in `data/`, not hardcoded:
+
+| File | Source | Content |
+|------|--------|---------|
+| `national_decade_data.csv` | Census POP-WP056, DHS Yearbook, Haines, NCHS | National population, foreign-born share, TFR, LPR admissions by decade |
+| `national_1870_baseline.csv` | Census POP-WP056, NHGIS 1870_cPAX | 1870 total population, Black population, foreign-born share |
+| `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, Black, AIAN, foreign-born by decade |
+| `modern_census_state_race_2000_2020.csv` | Census Bureau API (dec/sf1, dec/pl) | State-level total, Black, AIAN for 2000/2010/2020 |
+| `dhs_lpr_by_decade.csv` | DHS/OHSS Yearbook Table 1 | Gross LPR admissions by decade, 1820-2010 |
+| `state_fips_2024_electoral_votes.csv` | National Archives | State FIPS codes and 2024 EV baseline |
+
 ## Project structure
 
 ```text
 pre1870_reapportionment_package/
-├── fetch_pre1870_inputs.py              # Data acquisition: Census API, static inputs
 ├── scripts/
-│   ├── pre1870_ancestry_model.py        # National agent-based cohort simulation
-│   ├── state_pre1870_ancestry_model.py  # State-level reduced-form ancestry model
-│   └── hypothetical_ec_reapportionment.py  # Electoral College reapportionment (Huntington-Hill)
+│   ├── pre1870_ancestry_model.py          # National agent-based cohort simulation
+│   ├── state_pre1870_ancestry_model.py    # State reduced-form model (Method A)
+│   ├── state_agent_ancestry_model.py      # State agent-based model (Method B)
+│   ├── hypothetical_ec_reapportionment.py # Electoral College reapportionment
+│   ├── fetch_nhgis_state_panel.py         # NHGIS API data acquisition
+│   └── ...
 ├── data/
-│   ├── dhs_lpr_by_decade.csv            # Gross LPR admissions by decade (DHS Yearbook Table 1)
-│   ├── state_fips_2024_electoral_votes.csv  # FIPS codes, abbreviations, 2024 EV baseline
-│   ├── source_manifest.csv              # Source checklist for all required datasets
-│   ├── native_correction_notes.csv      # Notes on Native American under-enumeration
-│   ├── modern_census_state_race_2000_2020.csv  # [generated] State-level Census API data
-│   ├── modern_census_us_race_2000_2020.csv     # [generated] National Census API data
-│   └── geo/                             # Shapefiles for mapping
-├── outputs/
-│   ├── state_pre1870_estimates.csv      # State-level ancestry share estimates
-│   ├── state_pre1870_estimates_sensitivity.csv  # Sensitivity scenarios
-│   ├── hypothetical_ec_reapportionment_primary.csv  # Reapportioned EV table
-│   └── hypothetical_ec_reapportionment_primary_map.html  # Interactive choropleth
+│   ├── national_decade_data.csv           # National population anchors (with sources)
+│   ├── national_1870_baseline.csv         # 1870 baseline values (with sources)
+│   ├── nhgis_historical_state_panel_1790_1990.csv  # Historical state panel
+│   ├── modern_census_state_race_2000_2020.csv      # Modern Census API data
+│   ├── dhs_lpr_by_decade.csv              # Immigration admissions
+│   └── geo/                               # Shapefiles for mapping
+├── outputs/                               # Generated CSV and image outputs
 ├── notebooks/
-│   └── old_stock_analysis.ipynb         # Exploratory analysis notebook
-├── census_cache/                        # Cached Census API responses (JSON)
-├── MATH_AND_METHODS.md                  # Full mathematical specification
-├── ASSUMPTIONS.md                       # Model assumptions and sensitivity parameters
-├── PACKAGE_MANIFEST.csv                 # File inventory with sizes
-├── requirements.txt                     # Python dependencies
-└── .env.example                         # Template for Census API key
+│   └── old_stock_analysis.ipynb           # Main analysis notebook
+├── fetch_pre1870_inputs.py                # Data acquisition: Census API, static inputs
+├── MATH_AND_METHODS.md                    # Full mathematical specification
+└── ASSUMPTIONS.md                         # Model assumptions and sensitivity
 ```
 
 ## Quick start
@@ -42,88 +77,80 @@ pre1870_reapportionment_package/
 pip install -r requirements.txt
 ```
 
-### 1. Write static inputs (no API key needed)
+### 1. Fetch NHGIS historical data (requires NHGIS API key)
 
 ```bash
-python fetch_pre1870_inputs.py --write-static --validate
+export NHGIS_API_KEY="your_nhgis_key"
+python scripts/fetch_nhgis_state_panel.py
 ```
 
-### 2. Fetch modern Census data (requires API key)
+Or process an already-downloaded extract:
 
 ```bash
-export CENSUS_API_KEY="YOUR_CENSUS_KEY"
-python fetch_pre1870_inputs.py --fetch-modern-census --validate
+python scripts/fetch_nhgis_state_panel.py --from-zip nhgis_cache/nhgis_extract_2.zip nhgis_cache/nhgis_extract_3.zip
+```
+
+### 2. Fetch modern Census data (requires Census API key)
+
+```bash
+export CENSUS_API_KEY="your_census_key"
+python fetch_pre1870_inputs.py --fetch-modern-census --write-static --validate
 ```
 
 ### 3. Run the national ancestry model
 
 ```bash
 python scripts/pre1870_ancestry_model.py
-python scripts/pre1870_ancestry_model.py --json              # JSON output
-python scripts/pre1870_ancestry_model.py --sensitivity        # Run sensitivity grid
-python scripts/pre1870_ancestry_model.py --include-black-1870 # Include 1870 Black pop as qualifying
+python scripts/pre1870_ancestry_model.py --sensitivity
 ```
 
-### 4. Run the state-level model
+### 4. Run the state-level agent-based model
 
 ```bash
-# Using built-in fallback priors (no API key needed)
-python scripts/state_pre1870_ancestry_model.py --use-fallback --output outputs/state_pre1870_estimates.csv
-
-# Using live ACS data
-python scripts/state_pre1870_ancestry_model.py --download-acs --output outputs/state_pre1870_estimates.csv
-
-# With sensitivity analysis
-python scripts/state_pre1870_ancestry_model.py --use-fallback --sensitivity --output outputs/state_pre1870_estimates.csv
+python scripts/state_agent_ancestry_model.py --n-agents 300000 --seeds 1870,1871,1872
 ```
 
 ### 5. Run the Electoral College reapportionment
 
 ```bash
 python scripts/hypothetical_ec_reapportionment.py \
-  --input outputs/state_pre1870_estimates.csv \
+  --input outputs/state_agent_estimates.csv \
   --metric primary \
-  --output-csv outputs/hypothetical_ec_reapportionment_primary.csv \
-  --output-html outputs/hypothetical_ec_reapportionment_primary_map.html
+  --output-csv outputs/hypothetical_ec_reapportionment_primary.csv
 ```
 
-Alternative metrics: `any`, `average`, `primary` (default).
+### 6. Run the full analysis notebook
+
+```bash
+export CENSUS_API_KEY="your_census_key"
+jupyter notebook notebooks/old_stock_analysis.ipynb
+```
 
 ## Safe key handling
 
-Do not put your Census API key directly in the command line or commit it to a file. Use an environment variable:
+Do not commit API keys. Use environment variables:
 
 ```bash
-export CENSUS_API_KEY="YOUR_CENSUS_KEY"
+export CENSUS_API_KEY="your_census_key"
+export NHGIS_API_KEY="your_nhgis_key"
 ```
 
-The script redacts the key from error messages and does not store the key in output CSVs. To print query templates without the key:
+## NHGIS citation
 
-```bash
-python fetch_pre1870_inputs.py --show-queries
-```
+This project uses NHGIS data. If you use these results, cite:
 
-## Historical data (requires manual setup)
-
-The model benefits from historical state-level race/nativity data for 1790-1990. The best source is [IPUMS NHGIS](https://www.nhgis.org/).
-
-Expected cleaned file:
-
-```text
-data/nhgis_historical_state_panel_1790_1990.csv
-```
-
-Required columns: `year`, `state`, `abbr`, `total`. Optional columns that improve accuracy: `black`, `aian`, `foreign_born`, `native_parentage`.
+> Jonathan Schroeder, David Van Riper, Steven Manson, Katherine Knowles, Tracy Kugler, Finn Roberts, and Steven Ruggles. IPUMS National Historical Geographic Information System: Version 20.0 [dataset]. Minneapolis, MN: IPUMS. 2025. http://doi.org/10.18128/D050.V20.0
 
 ## Documentation
 
-- **[MATH_AND_METHODS.md](MATH_AND_METHODS.md)** — Full mathematical specification: cohort model equations, Huntington-Hill apportionment, data inputs, validation checks, and limitations.
-- **[ASSUMPTIONS.md](ASSUMPTIONS.md)** — Model assumptions, default parameters, sensitivity ranges, and data source bibliography.
+- **[MATH_AND_METHODS.md](MATH_AND_METHODS.md)** — Full mathematical specification
+- **[ASSUMPTIONS.md](ASSUMPTIONS.md)** — Model assumptions and sensitivity parameters
 
 ## Dependencies
 
 - Python 3.9+
-- `requests` — for Census API calls
-- `pandas` — for the reapportionment script
-- `numpy` — for the national agent-based model
-- `plotly` — optional, for the interactive HTML map
+- `numpy` — agent-based simulation
+- `pandas` — data manipulation and reapportionment
+- `requests` — Census and NHGIS API calls
+- `matplotlib` — visualizations
+- `plotly` — optional, interactive HTML map

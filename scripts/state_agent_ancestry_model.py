@@ -25,7 +25,7 @@ import argparse
 import csv
 import pathlib
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -202,16 +202,20 @@ def allocate_agents_to_states(
     if total_pop == 0:
         return {}
 
-    alloc = {}
-    remaining = n_agents
-    for abbr in sorted(state_pops):
-        raw = max(min_per_state, round(n_agents * state_pops[abbr] / total_pop))
-        alloc[abbr] = raw
-        remaining -= raw
+    n_states = len(state_pops)
+    effective_min = min(min_per_state, n_agents // max(n_states, 1))
 
-    # Adjust largest state to absorb rounding difference
-    largest = max(alloc, key=lambda s: state_pops.get(s, 0))
-    alloc[largest] += remaining
+    alloc = {}
+    for abbr in sorted(state_pops):
+        raw = max(effective_min, round(n_agents * state_pops[abbr] / total_pop))
+        alloc[abbr] = raw
+
+    # Scale to match target exactly
+    current_total = sum(alloc.values())
+    if current_total != n_agents and current_total > 0:
+        diff = n_agents - current_total
+        largest = max(alloc, key=lambda s: state_pops.get(s, 0))
+        alloc[largest] = max(effective_min, alloc[largest] + diff)
 
     return alloc
 
@@ -327,20 +331,24 @@ def simulate_states(
             state_q = q[mask]
             n_state = len(state_q)
 
-            if n_state == 0:
-                # New state with no agents yet — will be filled by migration
-                continue
-
             # Immigrants for this state
             n_imm = int(round(total_immigrants * state_imm_fracs.get(s, 0)))
+
+            if n_state == 0:
+                # New state — only gets immigrants this decade; migration fills the rest
+                if n_imm > 0:
+                    new_q_parts.append(np.zeros(n_imm, dtype=np.float64))
+                    new_sid_parts.append(np.full(n_imm, sid, dtype=np.int32))
+                continue
+
             n_resident = max(1, target_agents.get(s, n_state) - n_imm)
 
             n_births = int(round(turnover * n_resident))
             n_carry = n_resident - n_births
 
             if n_carry > 0 and n_state > 0:
-                carry_idx = rng.integers(0, n_state, size=min(n_carry, n_state * 3))
-                carry_q = state_q[carry_idx[:n_carry]] if n_carry <= len(carry_idx) else state_q[carry_idx]
+                carry_idx = rng.integers(0, n_state, size=n_carry)
+                carry_q = state_q[carry_idx]
             else:
                 carry_q = np.array([], dtype=np.float64)
 
@@ -406,6 +414,21 @@ def simulate_states(
                         state_ids, np.full(n_add, sid, dtype=np.int32)
                     ])
                     out_pos += n_add
+
+        # Fill any remaining deficits by sampling from the national population.
+        # This handles new states that need more agents than the out-pool provides.
+        if len(q) > 0:
+            for s in active_states:
+                sid = state_to_idx[s]
+                current = int((state_ids == sid).sum())
+                target = target_agents.get(s, current)
+                deficit = target - current
+                if deficit > 0:
+                    sampled_q = q[rng.integers(0, len(q), size=deficit)]
+                    q = np.concatenate([q, sampled_q])
+                    state_ids = np.concatenate([
+                        state_ids, np.full(deficit, sid, dtype=np.int32)
+                    ])
 
         # Shuffle within each state
         perm = rng.permutation(len(q))
@@ -499,7 +522,6 @@ def run_multi_seed(
         any_q = sum(r["any_qualifying_ancestor_share"] for r in runs) / n
         pri_q = sum(r["primary_qualifying_ancestry_share"] for r in runs) / n
 
-        from dataclasses import replace
         averaged.append(replace(
             base,
             average_qualifying_ancestry=avg_q,

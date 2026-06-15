@@ -88,7 +88,7 @@ HISTORICAL_STATE_MAP: Dict[str, str] = {
     "California": "CA",
     "Colorado": "CO", "Colorado Territory": "CO",
     "Connecticut": "CT",
-    "Dakota Territory": None,  # split into ND/SD in 1889
+    "Dakota Territory": None,  # split to ND+SD in post-processing
     "Delaware": "DE",
     "District Of Columbia": "DC", "District of Columbia": "DC",
     "Florida": "FL", "Florida Territory": "FL",
@@ -254,6 +254,8 @@ def parse_nhgis_zip(zip_path: pathlib.Path) -> Dict[Tuple[int, str], Dict]:
     Returns {(year, abbr): {col_code: value, ...}} with raw NHGIS column codes.
     """
     records: Dict[Tuple[int, str], Dict] = {}
+    # Collect records that map to None (e.g., Dakota Territory) for post-processing
+    unresolved: List[Tuple[int, str, Dict]] = []
 
     with zipfile.ZipFile(zip_path) as zf:
         csv_files = [n for n in zf.namelist() if n.endswith(".csv")]
@@ -265,6 +267,11 @@ def parse_nhgis_zip(zip_path: pathlib.Path) -> Dict[Tuple[int, str], Dict]:
                     state_name = row.get("STATE") or row.get("AREANAME", "")
                     abbr = resolve_abbr(state_name)
                     if abbr is None:
+                        if "Dakota" in state_name:
+                            data = {col: val for col, val in row.items()
+                                    if col not in ("GISJOIN", "YEAR", "STATE", "STATEA",
+                                                   "COUNTYA", "AREANAME", "STATEICP", "COUNTYICP")}
+                            unresolved.append((year, state_name, data))
                         continue
                     key = (year, abbr)
                     if key not in records:
@@ -273,6 +280,19 @@ def parse_nhgis_zip(zip_path: pathlib.Path) -> Dict[Tuple[int, str], Dict]:
                         if col not in ("GISJOIN", "YEAR", "STATE", "STATEA",
                                        "COUNTYA", "AREANAME", "STATEICP", "COUNTYICP"):
                             records[key][col] = val
+
+    # Split Dakota Territory 50/50 into ND and SD for pre-1890 decades
+    for year, name, data in unresolved:
+        for abbr in ("ND", "SD"):
+            key = (year, abbr)
+            if key not in records:
+                records[key] = {}
+            for col, val in data.items():
+                try:
+                    numeric = int(float(val))
+                    records[key][col] = str(numeric // 2)
+                except (ValueError, TypeError):
+                    records[key][col] = val
 
     return records
 
@@ -453,30 +473,50 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         foreign_born = _g(c, "B4J002")
 
     elif year == 1960:
-        # B5O001: Total Pop | B5V001: Foreign Stock total
+        # B5O001: Total Pop | B5V001: Foreign Stock (FB + native of foreign parentage — NOT just FB)
         # B5S001-14: Sex by Race (M White, M Negro, M Indian, M Japanese, M Chinese,
         #            M Filipino, M Other, F White, F Negro, F Indian, ...)
         total = _g(c, "B5O001")
         black = _sum(c, "B5S002", "B5S009")
         aian = _sum(c, "B5S003", "B5S010")
-        foreign_born = _g(c, "B5V001")
+        # B5V001 is foreign stock, not foreign-born. No pure FB table in this extract.
 
     elif year == 1970:
-        # C0X001: White | C0X002: Negro | C0X003: Other
-        # C0Z001: Native-born | C0Z002: Foreign-born
-        total = _sum(c, "C0X001", "C0X002", "C0X003")
-        black = _g(c, "C0X002")
+        # Prefer 100% count data (1970_Cnt2 NT1: Sex by Race, 18 vars)
+        # CEB001-009: Male by race, CEB010-018: Female by race
+        total_100 = _sum(c, "CEB001", "CEB002", "CEB003", "CEB004", "CEB005",
+                            "CEB006", "CEB007", "CEB008", "CEB009",
+                            "CEB010", "CEB011", "CEB012", "CEB013", "CEB014",
+                            "CEB015", "CEB016", "CEB017", "CEB018")
+        if total_100:
+            total = total_100
+            black = _sum(c, "CEB002", "CEB011")
+            aian = _sum(c, "CEB003", "CEB012")
+        else:
+            # Fallback to sample-based (1970_Cnt4Pa)
+            # C0X001: White | C0X002: Negro | C0X003: Other
+            total = _sum(c, "C0X001", "C0X002", "C0X003")
+            black = _g(c, "C0X002")
+        # C0Z001: Native-born | C0Z002: Foreign-born (from sample data)
         foreign_born = _g(c, "C0Z002")
 
     elif year == 1980:
-        # From STF1 (ds104): C9G001: White | C9G002: Black | C9G003: Amer Indian | C9G004: Other
+        # Prefer 100% PL94-171 race data
+        # C6X001: White | C6X002: Black | C6X003: AIAN | C6X004: Asian/PI | C6X005: Other
+        total_pl = _sum(c, "C6X001", "C6X002", "C6X003", "C6X004", "C6X005")
+        if total_pl:
+            total = total_pl
+            black = _g(c, "C6X002")
+            aian = _g(c, "C6X003")
+        else:
+            # Fallback to STF1 NT9B
+            # C9G001: White | C9G002: Black | C9G003: Amer Indian | C9G004: Other
+            total_race = _sum(c, "C9G001", "C9G002", "C9G003", "C9G004")
+            if total_race:
+                total = total_race
+            black = _g(c, "C9G002")
+            aian = _g(c, "C9G003")
         # From STF4Pa (ds110): DV0001-3: Nativity/Citizenship
-        #   DV0001: Native-born | DV0002: FB Naturalized | DV0003: FB Not citizen
-        total_race = _sum(c, "C9G001", "C9G002", "C9G003", "C9G004")
-        if total_race:
-            total = total_race
-        black = _g(c, "C9G002")
-        aian = _g(c, "C9G003")
         foreign_born = _sum(c, "DV0002", "DV0003")
 
     elif year == 1990:
@@ -535,8 +575,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Fetch NHGIS historical state panel and build harmonized CSV."
     )
-    parser.add_argument("--from-zip", type=pathlib.Path,
-                        help="Process an already-downloaded NHGIS extract zip.")
+    parser.add_argument("--from-zip", type=pathlib.Path, nargs="+",
+                        help="Process already-downloaded NHGIS extract zip(s).")
     parser.add_argument("--extract-num", type=int,
                         help="Poll and download a previously submitted extract by number.")
     parser.add_argument("--api-key", default=NHGIS_API_KEY,
@@ -549,7 +589,7 @@ def main() -> int:
     _set_api_key(args.api_key)
 
     if args.from_zip:
-        zip_path = args.from_zip
+        zip_paths = args.from_zip
     else:
         if not NHGIS_API_KEY:
             print("Set NHGIS_API_KEY or pass --api-key.", file=sys.stderr)
@@ -567,11 +607,17 @@ def main() -> int:
             return 1
 
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        zip_path = CACHE_DIR / f"nhgis_extract_{extract_num}.zip"
-        download_extract(dl_url, zip_path)
+        zip_paths = [CACHE_DIR / f"nhgis_extract_{extract_num}.zip"]
+        download_extract(dl_url, zip_paths[0])
 
-    print(f"\nParsing {zip_path}...")
-    records = parse_nhgis_zip(zip_path)
+    print(f"\nParsing {len(zip_paths)} zip file(s)...")
+    records: Dict[Tuple[int, str], Dict] = {}
+    for zp in zip_paths:
+        partial = parse_nhgis_zip(zp)
+        for key, cols in partial.items():
+            if key not in records:
+                records[key] = {}
+            records[key].update(cols)
     print(f"Parsed {len(records)} state-year records from NHGIS CSV files.")
 
     rows = harmonize_records(records)

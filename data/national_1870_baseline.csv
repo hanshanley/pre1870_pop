@@ -1,0 +1,4 @@
+field,value,source
+total_1870,38558371,Census POP-WP056 / NHGIS 1870_cPAX NT1 (state sum=38544190)
+black_1870,4880009,Census POP-WP056 / NHGIS 1870_cPAX NT4 (state sum=4879915)
+foreign_born_1870_share,0.144,Census POP-WP081 / NHGIS 1870_cPAX NT5 (state-derived=0.1443)

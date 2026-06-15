@@ -47,11 +47,16 @@ Requires: Python 3.9+, numpy.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import pathlib
 from dataclasses import asdict, dataclass
 from typing import Dict, Iterable, List, Sequence
 
 import numpy as np
+
+_ROOT = pathlib.Path(__file__).resolve().parent.parent
+_DATA_DIR = _ROOT / "data"
 
 
 # ── Decade-level population anchors ─────────────────────────────────────────
@@ -70,29 +75,65 @@ class DecadeData:
     immigrant_admissions_prev_decade: int  # LPR admissions during the prior decade
 
 
-DECADE_DATA: List[DecadeData] = [
-    DecadeData(1870,  38_558_371, 0.144, 4.55, 0),
-    DecadeData(1880,  50_189_209, 0.133, 4.24, 2_812_191),
-    DecadeData(1890,  62_979_766, 0.148, 3.87, 5_246_613),
-    DecadeData(1900,  76_212_168, 0.137, 3.56, 3_687_564),
-    DecadeData(1910,  92_228_496, 0.146, 3.42, 8_795_386),
-    DecadeData(1920, 106_021_537, 0.132, 3.17, 5_735_811),
-    DecadeData(1930, 123_202_624, 0.116, 2.45, 4_107_209),
-    DecadeData(1940, 132_164_569, 0.088, 2.30,   528_431),
-    DecadeData(1950, 151_325_798, 0.069, 3.00, 1_035_039),
-    DecadeData(1960, 179_323_175, 0.054, 3.65, 2_515_479),
-    DecadeData(1970, 203_211_926, 0.047, 2.48, 3_321_677),
-    DecadeData(1980, 226_545_805, 0.060, 1.84, 4_493_314),
-    DecadeData(1990, 248_709_873, 0.079, 2.08, 7_338_062),
-    DecadeData(2000, 281_421_906, 0.111, 2.06, 9_095_417),
-    DecadeData(2010, 308_745_538, 0.129, 1.93, 10_299_430),
-    DecadeData(2020, 331_449_281, 0.146, 1.64, 10_250_000),
-]
+def _load_decade_data(path: pathlib.Path) -> List[DecadeData]:
+    """Load decade-level population anchors from CSV."""
+    out = []
+    with open(path) as f:
+        for row in csv.DictReader(f):
+            out.append(DecadeData(
+                year=int(row["year"]),
+                total_population=int(row["total_population"]),
+                foreign_born_share_target=float(row["foreign_born_share_target"]),
+                tfr=float(row["tfr"]),
+                immigrant_admissions_prev_decade=int(row["immigrant_admissions_prev_decade"]),
+            ))
+    return sorted(out, key=lambda d: d.year)
 
-# 1870 Census baseline values
-TOTAL_1870 = 38_558_371
-BLACK_1870 = 4_880_009          # Census POP-WP056
-FOREIGN_BORN_1870_SHARE = 0.144  # Census POP-WP081
+
+def _load_1870_baseline(path: pathlib.Path) -> Dict[str, float]:
+    """Load 1870 baseline values (total, Black pop, FB share) from CSV."""
+    out = {}
+    with open(path) as f:
+        for row in csv.DictReader(f):
+            out[row["field"]] = float(row["value"])
+    return out
+
+
+_DECADE_CSV = _DATA_DIR / "national_decade_data.csv"
+_BASELINE_CSV = _DATA_DIR / "national_1870_baseline.csv"
+
+DECADE_DATA: List[DecadeData]
+if _DECADE_CSV.exists():
+    DECADE_DATA = _load_decade_data(_DECADE_CSV)
+else:
+    DECADE_DATA = [
+        DecadeData(1870,  38_558_371, 0.144, 4.55, 0),
+        DecadeData(1880,  50_189_209, 0.133, 4.24, 2_812_191),
+        DecadeData(1890,  62_979_766, 0.148, 3.87, 5_246_613),
+        DecadeData(1900,  76_212_168, 0.137, 3.56, 3_687_564),
+        DecadeData(1910,  92_228_496, 0.146, 3.42, 8_795_386),
+        DecadeData(1920, 106_021_537, 0.132, 3.17, 5_735_811),
+        DecadeData(1930, 123_202_624, 0.116, 2.45, 4_107_209),
+        DecadeData(1940, 132_164_569, 0.088, 2.30,   528_431),
+        DecadeData(1950, 151_325_798, 0.069, 3.00, 1_035_039),
+        DecadeData(1960, 179_323_175, 0.054, 3.65, 2_515_479),
+        DecadeData(1970, 203_211_926, 0.047, 2.48, 3_321_677),
+        DecadeData(1980, 226_545_805, 0.060, 1.84, 4_493_314),
+        DecadeData(1990, 248_709_873, 0.079, 2.08, 7_338_062),
+        DecadeData(2000, 281_421_906, 0.111, 2.06, 9_095_417),
+        DecadeData(2010, 308_745_538, 0.129, 1.93, 10_299_430),
+        DecadeData(2020, 331_449_281, 0.146, 1.64, 10_250_000),
+    ]
+
+if _BASELINE_CSV.exists():
+    _baseline = _load_1870_baseline(_BASELINE_CSV)
+    TOTAL_1870 = int(_baseline["total_1870"])
+    BLACK_1870 = int(_baseline["black_1870"])
+    FOREIGN_BORN_1870_SHARE = _baseline["foreign_born_1870_share"]
+else:
+    TOTAL_1870 = 38_558_371
+    BLACK_1870 = 4_880_009
+    FOREIGN_BORN_1870_SHARE = 0.144
 
 
 # ── Model parameters ───────────────────────────────────────────────────────
