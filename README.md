@@ -6,15 +6,15 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 
 ## Key outputs
 
-### Share of U.S. population with pre-1870 White Heritage ancestry, 1870-2020
+### Share of U.S. population with pre-1870 White Heritage American ancestry, 1870-2020
 
-![National White Heritage share over time](outputs/pct_white_heritage_over_time.png)
+![National White Heritage American share over time](outputs/pct_white_heritage_over_time.png)
 
-### U.S. population by White Heritage ancestry status
+### U.S. population by White Heritage American ancestry status
 
 ![Raw headcount](outputs/raw_headcount_white_heritage.png)
 
-### State-level White Heritage ancestry share (agent-based model)
+### State-level White Heritage American ancestry share (agent-based model)
 
 ![State map](outputs/map_white_heritage_pct_by_state.png)
 

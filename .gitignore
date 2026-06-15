@@ -3,9 +3,7 @@ __pycache__/
 .DS_Store
 *.egg-info/
 .env
+.vscode/
 
-# NHGIS extract cache (large zip files, not for redistribution)
-nhgis_cache/
-
-# Census API response cache
-census_cache/
+# Cached API responses (Census JSON, NHGIS extract zips)
+cache/

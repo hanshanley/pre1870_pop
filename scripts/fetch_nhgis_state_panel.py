@@ -41,7 +41,7 @@ except ImportError as exc:
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
-CACHE_DIR = ROOT / "nhgis_cache"
+CACHE_DIR = ROOT / "cache"
 
 NHGIS_API_KEY = os.environ.get("NHGIS_API_KEY", "")
 API_BASE = "https://api.ipums.org"

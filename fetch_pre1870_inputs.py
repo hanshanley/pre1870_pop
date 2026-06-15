@@ -74,7 +74,7 @@ except ImportError as exc:
 
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
-CACHE_DIR = ROOT / "census_cache"
+CACHE_DIR = ROOT / "cache"
 DATA_DIR.mkdir(exist_ok=True)
 CACHE_DIR.mkdir(exist_ok=True)
 
@@ -178,7 +178,7 @@ def now_utc() -> str:
 
 
 def cache_path(name: str) -> pathlib.Path:
-    """Return the path for a named cache file in the census_cache/ directory."""
+    """Return the path for a named cache file in the cache/ directory."""
     return CACHE_DIR / name
 
 
@@ -314,7 +314,7 @@ def fetch_modern_census(force: bool = False) -> None:
 
     Queries both national and state-level geographies for each year and writes
     two output CSVs: one for state-level data and one for national totals.
-    Results are cached as JSON in census_cache/ to avoid redundant API calls.
+    Results are cached as JSON in cache/ to avoid redundant API calls.
     """
     state_rows = []
     us_rows = []
