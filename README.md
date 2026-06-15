@@ -1,22 +1,22 @@
-# Pre-1870 Ancestry Stock Model and Electoral College Reapportionment
+# Pre-1870 White Heritage American Ancestry Model and Electoral College Reapportionment
 
-This package estimates what share of each U.S. state's current population descends from people living in the United States before 1870, then asks: **what would the Electoral College look like if the census counted only that population?**
+This package estimates what share of each U.S. state's current population descends from White residents living in the United States before 1870, then asks: **what would the Electoral College look like if the census counted only that population?**
 
 The model is a counterfactual apportionment exercise. It does not predict how anyone would vote.
 
 ## Key outputs
 
-### Share of Americans with pre-1870 non-Black ancestry, 1870-2020
+### Share of U.S. population with pre-1870 White Heritage ancestry, 1870-2020
 
-![National old-stock share over time](outputs/pct_old_stock_over_time.png)
+![National White Heritage share over time](outputs/pct_white_heritage_over_time.png)
 
-### U.S. population by old-stock ancestry status
+### U.S. population by White Heritage ancestry status
 
-![Raw headcount](outputs/raw_headcount_old_stock.png)
+![Raw headcount](outputs/raw_headcount_white_heritage.png)
 
-### State-level old-stock ancestry share (agent-based model)
+### State-level White Heritage ancestry share (agent-based model)
 
-![State map](outputs/map_old_stock_pct_by_state.png)
+![State map](outputs/map_white_heritage_pct_by_state.png)
 
 ### Hypothetical Electoral College reapportionment
 
