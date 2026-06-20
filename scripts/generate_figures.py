@@ -32,7 +32,7 @@ import matplotlib.patheffects as pe
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
-from matplotlib.patches import FancyBboxPatch, Circle
+from matplotlib.patches import FancyBboxPatch, Circle, Rectangle
 from matplotlib.collections import PatchCollection
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -242,49 +242,92 @@ def fig_state_map(df_state):
     plt.close(fig)
 
 
-def fig_ec_cartogram(df_state):
-    CELL = 1.0
-    MAX_R = CELL * 0.46
-    ev_cmap = LinearSegmentedColormap.from_list(
-        "ev_change", [SUBSTACK_BLUE, "#9DBFCC", SUBSTACK_BG, "#D4956A", SUBSTACK_ACCENT], N=256)
-    ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
-    fig, ax = plt.subplots(1, 1, figsize=(15, 9))
-    ax.set_axis_off()
-    max_ev = df_state["hypothetical_ev"].max()
-    patches, colors_arr, labels_info = [], [], []
+def _pack_state_blocks(df_state, unit=1.0, gap=0.45, anchor_scale=7.0, iters=900):
+    """Lay out each state as a block of unit cells (= hypothetical EV), anchored at
+    its geographic tile position, then iteratively remove overlaps (Demers-style)
+    while gently pulling each block toward its anchor to preserve geography."""
+    blocks = []
     for _, row in df_state.iterrows():
         abbr = row["abbr"]
         if abbr not in TILE:
             continue
-        col, grow = TILE[abbr]
-        cx, cy = col * CELL, -grow * CELL
-        ev = row["hypothetical_ev"]
-        r = MAX_R * np.sqrt(ev / max_ev)
-        patches.append(Circle((cx, cy), r))
-        colors_arr.append(row["ev_change"])
-        labels_info.append((cx, cy, abbr, int(row["actual_ev_2024"]), int(ev), int(row["ev_change"]), r))
-    pc = PatchCollection(patches, cmap=ev_cmap, norm=ev_norm,
-                         edgecolor="#AEAAA0", linewidth=0.8, alpha=0.85)
-    pc.set_array(np.array(colors_arr))
-    ax.add_collection(pc)
-    for cx, cy, abbr, actual, hyp, change, r in labels_info:
-        ax.text(cx, cy + r * 0.15, abbr, ha="center", va="center", fontsize=8, fontweight="bold",
-                color=SUBSTACK_TEXT, path_effects=[pe.withStroke(linewidth=2.5, foreground="white")], zorder=4)
-        if change != 0:
-            sign = "+" if change > 0 else ""
-            change_color = SUBSTACK_ACCENT if change > 0 else SUBSTACK_BLUE
-            ax.text(cx, cy - r * 0.35, f"{sign}{change}", ha="center", va="center", fontsize=7,
-                    fontweight="bold", color=change_color,
-                    path_effects=[pe.withStroke(linewidth=2, foreground="white")], zorder=4)
+        ev = int(round(row["hypothetical_ev"]))
+        cols = max(1, int(round(ev ** 0.5)))
+        rows_ = -(-ev // cols)  # ceil division
+        col_a, row_a = TILE[abbr]
+        ax_, ay_ = col_a * anchor_scale, -row_a * anchor_scale
+        blocks.append({
+            "abbr": abbr, "ev": ev, "change": int(row["ev_change"]),
+            "cols": cols, "rows": rows_, "w": cols * unit, "h": rows_ * unit,
+            "ax": ax_, "ay": ay_, "cx": ax_, "cy": ay_,
+        })
+    for _ in range(iters):
+        moved = False
+        for b in blocks:  # weak pull toward geographic anchor
+            b["cx"] += 0.015 * (b["ax"] - b["cx"])
+            b["cy"] += 0.015 * (b["ay"] - b["cy"])
+        for i in range(len(blocks)):
+            for j in range(i + 1, len(blocks)):
+                a, b = blocks[i], blocks[j]
+                dx, dy = b["cx"] - a["cx"], b["cy"] - a["cy"]
+                ox = (a["w"] + b["w"]) / 2 + gap - abs(dx)
+                oy = (a["h"] + b["h"]) / 2 + gap - abs(dy)
+                if ox > 0 and oy > 0:  # axis-aligned overlap: push along least penetration
+                    if ox < oy:
+                        s = ox / 2 * (1 if dx >= 0 else -1)
+                        a["cx"] -= s; b["cx"] += s
+                    else:
+                        s = oy / 2 * (1 if dy >= 0 else -1)
+                        a["cy"] -= s; b["cy"] += s
+                    moved = True
+        if not moved:
+            break
+    return blocks
+
+
+def fig_ec_cartogram(df_state):
+    unit = 1.0
+    ev_cmap = LinearSegmentedColormap.from_list(
+        "ev_change", [SUBSTACK_BLUE, "#9DBFCC", SUBSTACK_BG, "#D4956A", SUBSTACK_ACCENT], N=256)
+    ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
+    blocks = _pack_state_blocks(df_state, unit=unit)
+
+    fig, ax = plt.subplots(1, 1, figsize=(16, 10))
+    ax.set_axis_off()
+
+    for b in blocks:
+        color = ev_cmap(ev_norm(b["change"]))
+        left = b["cx"] - b["w"] / 2.0
+        top = b["cy"] + b["h"] / 2.0
+        # Draw exactly `ev` unit cells (each cell = one electoral vote).
+        for k in range(b["ev"]):
+            cc, rr = k % b["cols"], k // b["cols"]
+            x = left + cc * unit
+            y = top - (rr + 1) * unit
+            ax.add_patch(Rectangle((x, y), unit, unit, facecolor=color,
+                                   edgecolor="white", linewidth=0.6, zorder=2))
+        # State abbreviation + EV change, centered on the block with a white halo.
+        ax.text(b["cx"], b["cy"] + 0.32 * unit, b["abbr"], ha="center", va="center",
+                fontsize=8.5, fontweight="bold", color=SUBSTACK_TEXT, zorder=4,
+                path_effects=[pe.withStroke(linewidth=2.6, foreground="white")])
+        if b["change"] != 0:
+            sign = "+" if b["change"] > 0 else ""
+            cc = SUBSTACK_ACCENT if b["change"] > 0 else SUBSTACK_BLUE
+            ax.text(b["cx"], b["cy"] - 0.52 * unit, f"{sign}{b['change']}", ha="center",
+                    va="center", fontsize=7.5, fontweight="bold", color=cc, zorder=4,
+                    path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
+
     ax.autoscale_view()
     ax.set_aspect("equal")
-    ax.margins(0.04)
+    ax.margins(0.03)
+
     sm = plt.cm.ScalarMappable(cmap=ev_cmap, norm=ev_norm)
     sm._A = []
     cbar = fig.colorbar(sm, ax=ax, fraction=0.02, pad=0.02, shrink=0.55)
     cbar.set_label("Electoral vote change vs. actual 2024", fontsize=12)
     cbar.ax.tick_params(labelsize=10)
     cbar.outline.set_edgecolor(SUBSTACK_GRID)
+
     ax.set_title('Hypothetical 2024 Electoral College If Census Counted\nOnly Majority Pre-1870 White "Heritage American" Population',
                  fontsize=18, fontweight="bold", pad=16)
     gainers = df_state[df_state["ev_change"] > 0].sort_values("ev_change", ascending=False)
@@ -294,7 +337,7 @@ def fig_ec_cartogram(df_state):
     fig.text(0.5, 0.05, f"Biggest gainers: {top_gain}\nBiggest losers: {top_lose}",
              ha="center", fontsize=10, color=SUBSTACK_TEXT, linespacing=1.6, fontweight="bold")
     fig.text(0.5, 0.01,
-             "Circle area proportional to hypothetical EV. Huntington-Hill method, 435 seats. DC fixed at 3 EV.\n"
+             "Each square = one electoral vote (Huntington-Hill, 435 House seats, DC fixed at 3 EV).\n"
              "Source: State agent-based model with NHGIS historical Census data",
              ha="center", fontsize=8, color=SUBSTACK_MUTED, style="italic")
     plt.tight_layout(rect=[0, 0.08, 1, 1])
