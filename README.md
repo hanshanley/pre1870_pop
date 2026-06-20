@@ -48,8 +48,8 @@ All model inputs are loaded from CSV files in `data/`, not hardcoded:
 | `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, White, Black, AIAN, foreign-born by decade |
 | `modern_census_state_race_2000_2020.csv` | Census Bureau API (dec/sf1, dec/pl) | State-level total, Black, AIAN for 2000/2010/2020 |
 | `dhs_lpr_by_decade.csv` | DHS/OHSS Yearbook Table 1 | Gross LPR admissions by decade, 1820-2010 |
-| `immigration_by_region_decade.csv` | DHS/OHSS Yearbook 2016 Table 2 | LPR admissions by world region of last residence, by decade, 1820-2016 |
-| `dhs_lpr_by_country_decade.csv` | DHS/OHSS Yearbook 2016 Table 2 | Country-level LPR admissions by decade (source detail for the regional file) |
+| `dhs_lpr_by_country_decade.csv` | DHS/OHSS Yearbook 2016, Table 2 (pp. 6-11) | Verbatim country-level LPR admissions by decade, 1820-2016, tagged with each row's continent and assigned world region (the auditable raw extract) |
+| `immigration_by_region_decade.csv` | Derived from `dhs_lpr_by_country_decade.csv` | LPR admissions aggregated to world region by decade; built and validated by `scripts/build_immigration_by_region.py` |
 | `state_fips_2024_electoral_votes.csv` | National Archives | State FIPS codes and 2024 EV baseline |
 
 ## Project structure
@@ -62,6 +62,8 @@ pre1870_reapportionment_package/
 │   ├── state_agent_ancestry_model.py      # State agent-based model (Method B)
 │   ├── hypothetical_ec_reapportionment.py # Electoral College reapportionment
 │   ├── fetch_nhgis_state_panel.py         # NHGIS API data acquisition
+│   ├── build_immigration_by_region.py     # Aggregate country-level DHS data to world regions (validated)
+│   ├── plot_immigration_by_region.py      # Charts of immigration by region of origin, 1820-2016
 │   ├── generate_figures.py               # Regenerate headline PNG figures (no API key)
 │   └── ...
 ├── data/
@@ -150,11 +152,38 @@ jupyter notebook notebooks/old_stock_analysis.ipynb
 ### 8. Plot immigration by world region of origin
 
 ```bash
+# (optional) rebuild the regional aggregates from the country-level extract
+python scripts/build_immigration_by_region.py
+# render the charts
 python scripts/plot_immigration_by_region.py
 ```
 
-Generates stacked-area, share, and small-multiples charts of legal immigration
-by region of last residence (1820-2016) in `outputs/`.
+Produces stacked-area, 100%-share, and small-multiples charts of legal
+immigration by world region, 1820-2016, in `outputs/`.
+
+**Provenance.** Every value traces to DHS/OHSS *Yearbook of Immigration
+Statistics 2016*, Table 2 (*Persons Obtaining Lawful Permanent Resident Status by
+Region and Selected Country of Last Residence: Fiscal Years 1820 to 2016*,
+[PDF](https://ohss.dhs.gov/sites/default/files/2023-12/2016%2520Yearbook%2520of%2520Immigration%2520Statistics.pdf),
+pp. 6-11). `dhs_lpr_by_country_decade.csv` is a verbatim transcription;
+`build_immigration_by_region.py` aggregates it to regions and **asserts** that
+the regions sum to the published grand total — and that the Europe/Asia/Africa
+member countries reproduce the published continental subtotals — for every decade.
+
+**Region definitions and source limitations (transparent choices).**
+
+- Europe is split using the source's own country rows; "Other Europe"
+  (post-1991 successor states, etc.) is assigned to Eastern Europe.
+- The historical table itemizes only 13 Asian countries, so `South Asia` is
+  **India only**, `Southeast Asia` is the **Philippines and Vietnam only**, and
+  every other Asian origin (Pakistan, Bangladesh, Iraq, Indonesia, ...) falls in
+  `Other Asia`. Legend labels state these contents explicitly.
+- `Middle East & North Africa` combines West-Asian rows (Iran, Israel, Jordan,
+  Syria, Turkey) with North-African rows (Egypt, Morocco), crossing the source's
+  Asia/Africa boundary by design.
+- `Other & not specified` = Oceania + Other America + Not Specified.
+- `2010-16` is a partial decade (it sums fiscal years 2010-2016 only) and is
+  flagged as such in the charts.
 
 ## Safe key handling
 
