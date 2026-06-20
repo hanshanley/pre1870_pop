@@ -242,120 +242,83 @@ def fig_state_map(df_state):
     plt.close(fig)
 
 
-def _pack_state_blocks(df_state, unit=1.0, gap=0.5, anchor_scale=4.0, iters=4000):
-    """Lay out each state as a block of unit cells (= hypothetical EV), anchored at
-    its geographic tile position, then iteratively (a) pull each block weakly toward
-    its anchor to preserve geography and (b) remove overlaps until the layout fully
-    converges with no two blocks colliding (Demers-style cartogram). No centroid
-    gravity: that pulls blocks into overlaps faster than they can separate, which
-    leaves an ugly blob; pure overlap-resolution gives a clean, compact packing."""
-    blocks = []
-    for _, row in df_state.iterrows():
-        abbr = row["abbr"]
-        if abbr not in TILE:
-            continue
-        ev = int(round(row["hypothetical_ev"]))
-        cols = max(1, int(round(ev ** 0.5)))
-        rows_ = -(-ev // cols)  # ceil division
-        col_a, row_a = TILE[abbr]
-        ax_, ay_ = col_a * anchor_scale, -row_a * anchor_scale
-        blocks.append({
-            "abbr": abbr, "ev": ev,
-            "actual": int(round(row["actual_ev_2024"])), "change": int(row["ev_change"]),
-            "cols": cols, "rows": rows_, "w": cols * unit, "h": rows_ * unit,
-            "ax": ax_, "ay": ay_, "cx": ax_, "cy": ay_,
-        })
-    for _ in range(iters):
-        for b in blocks:  # weak pull toward geographic anchor
-            b["cx"] += 0.02 * (b["ax"] - b["cx"])
-            b["cy"] += 0.02 * (b["ay"] - b["cy"])
-        moved = False
-        for _pass in range(4):  # several separation passes per iteration for convergence
-            for i in range(len(blocks)):
-                for j in range(i + 1, len(blocks)):
-                    a, b = blocks[i], blocks[j]
-                    dx, dy = b["cx"] - a["cx"], b["cy"] - a["cy"]
-                    ox = (a["w"] + b["w"]) / 2 + gap - abs(dx)
-                    oy = (a["h"] + b["h"]) / 2 + gap - abs(dy)
-                    if ox > 0 and oy > 0:  # axis-aligned overlap: push along least penetration
-                        if ox < oy:
-                            s = ox / 2 * (1 if dx >= 0 else -1)
-                            a["cx"] -= s; b["cx"] += s
-                        else:
-                            s = oy / 2 * (1 if dy >= 0 else -1)
-                            a["cy"] -= s; b["cy"] += s
-                        moved = True
-        if not moved:
-            break
-    return blocks
-
-
 def fig_ec_cartogram(df_state):
-    unit = 1.0
+    """Clean uniform tile-grid map: every state is an equally sized rounded square
+    placed on the recognizable U.S. grid (no irregular blobs, no random voids).
+    Color encodes the electoral-vote change; each tile is labeled with the state,
+    its actual 2024 -> hypothetical EV, and the absolute change."""
     ev_cmap = LinearSegmentedColormap.from_list(
-        "ev_change", [SUBSTACK_BLUE, "#9DBFCC", SUBSTACK_BG, "#D4956A", SUBSTACK_ACCENT], N=256)
+        "ev_change", [SUBSTACK_BLUE, "#9DBFCC", "#EDE7DC", "#D4956A", SUBSTACK_ACCENT], N=256)
     ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
-    blocks = _pack_state_blocks(df_state, unit=unit)
 
-    fig, ax = plt.subplots(1, 1, figsize=(16, 10))
+    rows = {r["abbr"]: r for _, r in df_state.iterrows()}
+    spacing, side = 1.0, 0.92
+    pad = (spacing - side) / 2.0
+
+    fig, ax = plt.subplots(1, 1, figsize=(15, 11))
     ax.set_axis_off()
 
-    for b in blocks:
-        color = ev_cmap(ev_norm(b["change"]))
-        left = b["cx"] - b["w"] / 2.0
-        top = b["cy"] + b["h"] / 2.0
-        # Draw exactly `ev` unit cells (each cell = one electoral vote).
-        for k in range(b["ev"]):
-            cc, rr = k % b["cols"], k // b["cols"]
-            x = left + cc * unit
-            y = top - (rr + 1) * unit
-            ax.add_patch(Rectangle((x, y), unit, unit, facecolor=color,
-                                   edgecolor="white", linewidth=0.6, zorder=2))
-        # Label: abbreviation, the baseline-to-hypothetical EV (actual -> hypothetical),
-        # and (on larger blocks) the absolute change, centered with a white halo.
-        side = min(b["w"], b["h"])
-        fs_abbr = max(6.5, min(11.0, 4.8 + side * 1.5))
-        big = b["rows"] >= 3  # enough height for a third label line
-        y_abbr = 0.26 * b["h"] if big else 0.18 * b["h"]
-        ax.text(b["cx"], b["cy"] + y_abbr, b["abbr"], ha="center", va="center",
-                fontsize=fs_abbr, fontweight="bold", color=SUBSTACK_TEXT, zorder=4,
-                path_effects=[pe.withStroke(linewidth=2.6, foreground="white")])
-        ax.text(b["cx"], b["cy"] - (0.02 * b["h"] if big else 0.16 * b["h"]),
-                f"{b['actual']}\u2192{b['ev']}", ha="center", va="center",
-                fontsize=fs_abbr * 0.82, color=SUBSTACK_TEXT, zorder=4,
-                path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
-        if big and b["change"] != 0:
-            sign = "+" if b["change"] > 0 else ""
-            cc = SUBSTACK_ACCENT if b["change"] > 0 else SUBSTACK_BLUE
-            ax.text(b["cx"], b["cy"] - 0.30 * b["h"], f"({sign}{b['change']})", ha="center",
-                    va="center", fontsize=fs_abbr * 0.78, fontweight="bold", color=cc, zorder=4,
-                    path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
+    for abbr, (col, grow) in TILE.items():
+        if abbr not in rows:
+            continue
+        r = rows[abbr]
+        change = int(r["ev_change"])
+        actual = int(round(r["actual_ev_2024"]))
+        hyp = int(round(r["hypothetical_ev"]))
+        x, y = col * spacing, -grow * spacing
+        color = ev_cmap(ev_norm(change))
+        # Tile.
+        ax.add_patch(FancyBboxPatch(
+            (x + pad, y + pad), side, side,
+            boxstyle="round,pad=0,rounding_size=0.10",
+            facecolor=color, edgecolor="white", linewidth=1.4, zorder=2,
+            mutation_aspect=1.0))
+        cx, cy = x + spacing / 2.0, y + spacing / 2.0
+        # Pick label color for contrast on dark (strong-change) tiles.
+        dark = change <= -14 or change >= 9
+        txt = "white" if dark else SUBSTACK_TEXT
+        halo = SUBSTACK_TEXT if dark else "white"
+        ax.text(cx, cy + 0.20 * side, abbr, ha="center", va="center",
+                fontsize=11, fontweight="bold", color=txt, zorder=4,
+                path_effects=[pe.withStroke(linewidth=2.4, foreground=halo)])
+        ax.text(cx, cy - 0.04 * side, f"{actual}\u2192{hyp}", ha="center", va="center",
+                fontsize=9.5, color=txt, zorder=4,
+                path_effects=[pe.withStroke(linewidth=2.0, foreground=halo)])
+        if change == 0:
+            chg_txt, chg_col = "(0)", (txt if dark else SUBSTACK_MUTED)
+        else:
+            sign = "+" if change > 0 else ""
+            chg_txt = f"({sign}{change})"
+            chg_col = "white" if dark else (SUBSTACK_ACCENT if change > 0 else SUBSTACK_BLUE)
+        ax.text(cx, cy - 0.27 * side, chg_txt, ha="center", va="center",
+                fontsize=9.5, fontweight="bold", color=chg_col, zorder=4,
+                path_effects=[pe.withStroke(linewidth=2.0, foreground=halo)])
 
-    ax.autoscale_view()
+    ax.set_xlim(-spacing, 11 * spacing)
+    ax.set_ylim(-7.6 * spacing, spacing)
     ax.set_aspect("equal")
-    ax.margins(0.03)
 
     sm = plt.cm.ScalarMappable(cmap=ev_cmap, norm=ev_norm)
     sm._A = []
-    cbar = fig.colorbar(sm, ax=ax, fraction=0.02, pad=0.02, shrink=0.55)
+    cbar = fig.colorbar(sm, ax=ax, fraction=0.025, pad=0.01, shrink=0.5)
     cbar.set_label("Electoral vote change vs. actual 2024", fontsize=12)
     cbar.ax.tick_params(labelsize=10)
     cbar.outline.set_edgecolor(SUBSTACK_GRID)
 
     ax.set_title('Hypothetical 2024 Electoral College If Census Counted\nOnly Majority Pre-1870 White "Heritage American" Population',
-                 fontsize=18, fontweight="bold", pad=16)
+                 fontsize=18, fontweight="bold", pad=14)
     gainers = df_state[df_state["ev_change"] > 0].sort_values("ev_change", ascending=False)
     losers = df_state[df_state["ev_change"] < 0].sort_values("ev_change")
     top_gain = ", ".join(f"{r['abbr']} ({int(r['ev_change']):+d})" for _, r in gainers.head(5).iterrows())
     top_lose = ", ".join(f"{r['abbr']} ({int(r['ev_change']):+d})" for _, r in losers.head(5).iterrows())
-    fig.text(0.5, 0.05, f"Biggest gainers: {top_gain}\nBiggest losers: {top_lose}",
+    fig.text(0.5, 0.055, f"Biggest gainers: {top_gain}\nBiggest losers: {top_lose}",
              ha="center", fontsize=10, color=SUBSTACK_TEXT, linespacing=1.6, fontweight="bold")
-    fig.text(0.5, 0.01,
-             "Each square = one electoral vote (Huntington-Hill, 435 House seats, DC fixed at 3 EV). "
-             "Labels show actual 2024 \u2192 hypothetical EV and the change.\n"
-             "Source: State agent-based model with NHGIS historical Census data",
+    fig.text(0.5, 0.015,
+             "Each tile is one state; the number is its actual 2024 \u2192 hypothetical electoral votes "
+             "and the change.\nHuntington-Hill apportionment, 435 House seats, DC fixed at 3 EV. "
+             "Source: state agent-based model with NHGIS historical Census data",
              ha="center", fontsize=8, color=SUBSTACK_MUTED, style="italic")
-    plt.tight_layout(rect=[0, 0.08, 1, 1])
+    plt.tight_layout(rect=[0, 0.085, 1, 1])
     plt.savefig(OUT / "map_hypothetical_ec_2024_tile_mosaic.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 

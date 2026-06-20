@@ -32,11 +32,12 @@ unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASS
 
 ![EC cartogram](outputs/map_hypothetical_ec_2024_tile_mosaic.png)
 
-Each square is one electoral vote. Every state is labeled with its **actual 2024
-EV → hypothetical EV** and the absolute change, so the starting point is visible
-alongside the shift. Color encodes the change (red = gains, blue = losses). The
-biggest swing is California (54 → 24, −30); the largest gainers are Indiana
-(+16), Ohio (+11), Missouri (+10), Kentucky (+9), and Tennessee (+8).
+Each tile is one state, evenly placed in a recognizable U.S. layout. Every tile
+is labeled with its **actual 2024 EV → hypothetical EV** and the absolute change,
+so the starting point is visible alongside the shift. Color encodes the change
+(red = gains, blue = losses). The biggest swing is California (54 → 24, −30); the
+largest gainers are Indiana (+16), Ohio (+11), Missouri (+10), Kentucky (+9), and
+Tennessee (+8).
 
 ### Legal immigration to the United States by region of origin, 1820-2016
 
