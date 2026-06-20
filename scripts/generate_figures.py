@@ -242,10 +242,12 @@ def fig_state_map(df_state):
     plt.close(fig)
 
 
-def _pack_state_blocks(df_state, unit=1.0, gap=0.45, anchor_scale=7.0, iters=900):
+def _pack_state_blocks(df_state, unit=1.0, gap=0.32, anchor_scale=3.2, iters=2600):
     """Lay out each state as a block of unit cells (= hypothetical EV), anchored at
-    its geographic tile position, then iteratively remove overlaps (Demers-style)
-    while gently pulling each block toward its anchor to preserve geography."""
+    its geographic tile position, then iteratively (a) pull each block toward its
+    anchor to preserve geography, (b) pull all blocks toward the global centroid to
+    compact the map and squeeze out empty space, and (c) remove overlaps so no two
+    blocks collide (Dorling/Demers-style cartogram)."""
     blocks = []
     for _, row in df_state.iterrows():
         abbr = row["abbr"]
@@ -257,15 +259,18 @@ def _pack_state_blocks(df_state, unit=1.0, gap=0.45, anchor_scale=7.0, iters=900
         col_a, row_a = TILE[abbr]
         ax_, ay_ = col_a * anchor_scale, -row_a * anchor_scale
         blocks.append({
-            "abbr": abbr, "ev": ev, "change": int(row["ev_change"]),
+            "abbr": abbr, "ev": ev,
+            "actual": int(round(row["actual_ev_2024"])), "change": int(row["ev_change"]),
             "cols": cols, "rows": rows_, "w": cols * unit, "h": rows_ * unit,
             "ax": ax_, "ay": ay_, "cx": ax_, "cy": ay_,
         })
     for _ in range(iters):
+        gx = sum(b["cx"] for b in blocks) / len(blocks)
+        gy = sum(b["cy"] for b in blocks) / len(blocks)
+        for b in blocks:
+            b["cx"] += 0.05 * (b["ax"] - b["cx"]) + 0.012 * (gx - b["cx"])
+            b["cy"] += 0.05 * (b["ay"] - b["cy"]) + 0.012 * (gy - b["cy"])
         moved = False
-        for b in blocks:  # weak pull toward geographic anchor
-            b["cx"] += 0.015 * (b["ax"] - b["cx"])
-            b["cy"] += 0.015 * (b["ay"] - b["cy"])
         for i in range(len(blocks)):
             for j in range(i + 1, len(blocks)):
                 a, b = blocks[i], blocks[j]
@@ -306,15 +311,21 @@ def fig_ec_cartogram(df_state):
             y = top - (rr + 1) * unit
             ax.add_patch(Rectangle((x, y), unit, unit, facecolor=color,
                                    edgecolor="white", linewidth=0.6, zorder=2))
-        # State abbreviation + EV change, centered on the block with a white halo.
-        ax.text(b["cx"], b["cy"] + 0.32 * unit, b["abbr"], ha="center", va="center",
-                fontsize=8.5, fontweight="bold", color=SUBSTACK_TEXT, zorder=4,
+        # Label: abbreviation, the baseline-to-hypothetical EV (actual -> hypothetical),
+        # and the absolute change, centered on the block with a white halo.
+        side = min(b["w"], b["h"])
+        fs_abbr = max(6.0, min(11.0, 4.6 + side * 1.5))
+        ax.text(b["cx"], b["cy"] + 0.24 * b["h"], b["abbr"], ha="center", va="center",
+                fontsize=fs_abbr, fontweight="bold", color=SUBSTACK_TEXT, zorder=4,
                 path_effects=[pe.withStroke(linewidth=2.6, foreground="white")])
+        ax.text(b["cx"], b["cy"] - 0.02 * b["h"], f"{b['actual']}\u2192{b['ev']}",
+                ha="center", va="center", fontsize=fs_abbr * 0.82, color=SUBSTACK_TEXT,
+                zorder=4, path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
         if b["change"] != 0:
             sign = "+" if b["change"] > 0 else ""
             cc = SUBSTACK_ACCENT if b["change"] > 0 else SUBSTACK_BLUE
-            ax.text(b["cx"], b["cy"] - 0.52 * unit, f"{sign}{b['change']}", ha="center",
-                    va="center", fontsize=7.5, fontweight="bold", color=cc, zorder=4,
+            ax.text(b["cx"], b["cy"] - 0.28 * b["h"], f"({sign}{b['change']})", ha="center",
+                    va="center", fontsize=fs_abbr * 0.78, fontweight="bold", color=cc, zorder=4,
                     path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
 
     ax.autoscale_view()
@@ -337,7 +348,8 @@ def fig_ec_cartogram(df_state):
     fig.text(0.5, 0.05, f"Biggest gainers: {top_gain}\nBiggest losers: {top_lose}",
              ha="center", fontsize=10, color=SUBSTACK_TEXT, linespacing=1.6, fontweight="bold")
     fig.text(0.5, 0.01,
-             "Each square = one electoral vote (Huntington-Hill, 435 House seats, DC fixed at 3 EV).\n"
+             "Each square = one electoral vote (Huntington-Hill, 435 House seats, DC fixed at 3 EV). "
+             "Labels show actual 2024 \u2192 hypothetical EV and the change.\n"
              "Source: State agent-based model with NHGIS historical Census data",
              ha="center", fontsize=8, color=SUBSTACK_MUTED, style="italic")
     plt.tight_layout(rect=[0, 0.08, 1, 1])
