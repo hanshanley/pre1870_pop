@@ -11,7 +11,7 @@ Figures produced (written to outputs/):
   - pct_white_heritage_over_time.png      (national time series, national model)
   - raw_headcount_white_heritage.png      (national headcount)
   - map_white_heritage_pct_by_state.png   (state tile cartogram, agent estimates)
-  - map_hypothetical_ec_2024_cartogram.png(EC tile cartogram, agent estimates)
+  - map_hypothetical_ec_2024_tile_mosaic.png(EC tile cartogram, agent estimates)
 
 Usage:
     python scripts/generate_figures.py
@@ -341,7 +341,7 @@ def fig_ec_cartogram(df_state):
              "Source: State agent-based model with NHGIS historical Census data",
              ha="center", fontsize=8, color=SUBSTACK_MUTED, style="italic")
     plt.tight_layout(rect=[0, 0.08, 1, 1])
-    plt.savefig(OUT / "map_hypothetical_ec_2024_cartogram.png", dpi=200, bbox_inches="tight")
+    plt.savefig(OUT / "map_hypothetical_ec_2024_tile_mosaic.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -362,7 +362,7 @@ def main() -> int:
 
     fig_state_map(df_state)
     fig_ec_cartogram(df_state)
-    print("  wrote map_white_heritage_pct_by_state.png, map_hypothetical_ec_2024_cartogram.png")
+    print("  wrote map_white_heritage_pct_by_state.png, map_hypothetical_ec_2024_tile_mosaic.png")
     return 0
 
 

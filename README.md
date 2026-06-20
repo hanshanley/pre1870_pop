@@ -30,9 +30,16 @@ unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASS
 
 ### Hypothetical Electoral College reapportionment
 
-![EC cartogram](outputs/map_hypothetical_ec_2024_cartogram.png)
+![EC cartogram](outputs/map_hypothetical_ec_2024_tile_mosaic.png)
 
 ### Legal immigration to the United States by region of origin, 1820-2016
+
+Each chart has a companion explainer (data source, build steps, region
+definitions, and verification): see
+[`outputs/immigration_by_region_absolute.md`](outputs/immigration_by_region_absolute.md),
+[`outputs/immigration_by_region_share.md`](outputs/immigration_by_region_share.md),
+and
+[`outputs/immigration_by_region_small_multiples.md`](outputs/immigration_by_region_small_multiples.md).
 
 ![Immigration by region, absolute](outputs/immigration_by_region_absolute.png)
 
@@ -66,7 +73,7 @@ All model inputs are loaded from CSV files in `data/`, not hardcoded:
 | `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, White, Black, AIAN, foreign-born by decade |
 | `modern_census_state_race_2000_2020.csv` | Census Bureau API (dec/sf1, dec/pl) | State-level total, Black, AIAN for 2000/2010/2020 |
 | `dhs_lpr_by_decade.csv` | DHS/OHSS Yearbook Table 1 | Gross LPR admissions by decade, 1820-2010 |
-| `fertility_by_nativity.csv` | Haines (Historical Statistics); Census ACS / CIS; Pew/NCHS | Foreign-born:native fertility ratio by decade |
+| `fertility_by_nativity.csv` | Manhattan Institute (2023); Census ACS / CIS (Camarota & Zeigler 2020) | FB:native fertility ratio by decade (cited anchors; interpolation flagged) |
 | `dhs_lpr_by_country_decade.csv` | DHS/OHSS Yearbook 2016, Table 2 (pp. 6-11) | Verbatim country-level LPR admissions by decade, 1820-2016, tagged with each row's continent and assigned world region (the auditable raw extract) |
 | `immigration_by_region_decade.csv` | Derived from `dhs_lpr_by_country_decade.csv` | LPR admissions aggregated to world region by decade; built and validated by `scripts/build_immigration_by_region.py` |
 | `state_fips_2024_electoral_votes.csv` | National Archives | State FIPS codes and 2024 EV baseline |
@@ -159,7 +166,7 @@ python scripts/generate_figures.py
 ```
 
 This writes `pct_white_heritage_over_time.png`, `raw_headcount_white_heritage.png`,
-`map_white_heritage_pct_by_state.png`, and `map_hypothetical_ec_2024_cartogram.png`
+`map_white_heritage_pct_by_state.png`, and `map_hypothetical_ec_2024_tile_mosaic.png`
 to `outputs/`.
 
 ### 7. Run the full analysis notebook
@@ -196,8 +203,13 @@ member countries reproduce the published continental subtotals — for every dec
   (post-1991 successor states, etc.) is assigned to Eastern Europe.
 - The historical table itemizes only 13 Asian countries, so `South Asia` is
   **India only**, `Southeast Asia` is the **Philippines and Vietnam only**, and
-  every other Asian origin (Pakistan, Bangladesh, Iraq, Indonesia, ...) falls in
-  `Other Asia`. Legend labels state these contents explicitly.
+  every other Asian origin — including **Indonesia** (which is geographically
+  Southeast Asian but not broken out by DHS), Thailand, Pakistan, Bangladesh,
+  Iraq, etc. — is collapsed by the source into `Other Asia` and cannot be
+  separated. Legend labels and the chart caption state this explicitly.
+- `Sub-Saharan Africa` is defined as Africa excluding Egypt and Morocco (the
+  source's `Other Africa` aggregate may include a few other North African
+  countries such as Algeria, Tunisia, Libya, or Sudan).
 - `Middle East & North Africa` combines West-Asian rows (Iran, Israel, Jordan,
   Syria, Turkey) with North-African rows (Egypt, Morocco), crossing the source's
   Asia/Africa boundary by design.
