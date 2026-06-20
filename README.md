@@ -4,6 +4,16 @@ This package estimates what share of each U.S. state's current population descen
 
 The model is a counterfactual apportionment exercise. It does not predict how anyone would vote.
 
+## Key findings (2020)
+
+- **~21%** of the U.S. population has *majority* (>50%) pre-1870 White Heritage ancestry; **~56%** has *any* pre-1870 White ancestor.
+- Rebased to the nonblack population (mass basis), **~31%** traces to the pre-1870 White stock — matching the Manhattan Institute's independent cohort-component estimate of ~31% pre-1860 nonblack ([Lehman, 2023](https://manhattan.institute/article/who-pays-for-reparations-the-immigration-challenge-in-the-reparations-debate)). The two methods converge once both use the cited native-vs-immigrant fertility differential.
+- Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −29, FL −13, NY −13**; biggest gainers **IN +16, OH +12, MO +11, TN +9, KY +9**.
+
+These figures use the cited per-decade foreign-born:native fertility differential
+(`data/fertility_by_nativity.csv`, default on). Disabling it (`--no-native-fertility`,
+unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASSUMPTIONS.md).
+
 ## Key outputs
 
 ### Share of U.S. population with pre-1870 White Heritage American ancestry, 1870-2020
@@ -41,7 +51,7 @@ The project implements two independent approaches to state-level estimation:
 
 **Method A — Reduced-form model** (`state_pre1870_ancestry_model.py`): Uses ACS foreign-born and Black-alone shares with calibration to national anchors. Fast but relies on hand-set `old_stock_factor` priors per state, which also absorb residual non-white / non-old-stock population (it does not subtract AIAN/other races explicitly).
 
-**Method B — Agent-based simulation** (`state_agent_ancestry_model.py`): Runs 300K agents through 1870-2020 using historical Census data from NHGIS (population, race, and nativity by state per decade). The 1870 qualifying stock is seeded from each state's enumerated **White** share (excluding Black, AIAN, and other races); state differences emerge from the simulation — no hand-set factors. This is the method behind the headline state map and EC cartogram.
+**Method B — Agent-based simulation** (`state_agent_ancestry_model.py`): Runs 300K agents through 1870-2020 using historical Census data from NHGIS (population, race, and nativity by state per decade). The 1870 qualifying stock is seeded from each state's enumerated **White** share (excluding Black, AIAN, and other races); immigrant-descended agents reproduce at the cited per-decade foreign-born:native fertility ratio (`data/fertility_by_nativity.csv`). State differences emerge from the simulation — no hand-set factors. This is the method behind the headline state map and EC cartogram.
 
 The notebook runs both and compares results.
 
@@ -81,6 +91,7 @@ pre1870_reapportionment_package/
 │   ├── nhgis_historical_state_panel_1790_1990.csv  # Historical state panel
 │   ├── modern_census_state_race_2000_2020.csv      # Modern Census API data
 │   ├── dhs_lpr_by_decade.csv              # Immigration admissions
+│   ├── fertility_by_nativity.csv          # Foreign-born:native fertility ratio (with sources)
 │   └── geo/                               # Shapefiles for mapping
 ├── outputs/                               # Generated CSV and image outputs
 ├── notebooks/
