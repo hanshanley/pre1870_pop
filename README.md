@@ -62,6 +62,7 @@ pre1870_reapportionment_package/
 │   ├── state_agent_ancestry_model.py      # State agent-based model (Method B)
 │   ├── hypothetical_ec_reapportionment.py # Electoral College reapportionment
 │   ├── fetch_nhgis_state_panel.py         # NHGIS API data acquisition
+│   ├── generate_figures.py               # Regenerate headline PNG figures (no API key)
 │   └── ...
 ├── data/
 │   ├── national_decade_data.csv           # National population anchors (with sources)
@@ -126,14 +127,27 @@ python scripts/hypothetical_ec_reapportionment.py \
   --output-csv outputs/hypothetical_ec_reapportionment_primary.csv
 ```
 
-### 6. Run the full analysis notebook
+### 6. Regenerate the headline figures
+
+Regenerates the four README figures from the national model and the committed
+agent estimates. No Census API key or notebook required:
+
+```bash
+python scripts/generate_figures.py
+```
+
+This writes `pct_white_heritage_over_time.png`, `raw_headcount_white_heritage.png`,
+`map_white_heritage_pct_by_state.png`, and `map_hypothetical_ec_2024_cartogram.png`
+to `outputs/`.
+
+### 7. Run the full analysis notebook
 
 ```bash
 export CENSUS_API_KEY="your_census_key"
 jupyter notebook notebooks/old_stock_analysis.ipynb
 ```
 
-### 7. Plot immigration by world region of origin
+### 8. Plot immigration by world region of origin
 
 ```bash
 python scripts/plot_immigration_by_region.py
