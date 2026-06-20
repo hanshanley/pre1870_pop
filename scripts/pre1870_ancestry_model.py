@@ -52,8 +52,8 @@ import argparse
 import csv
 import json
 import pathlib
-from dataclasses import asdict, dataclass
-from typing import Dict, Iterable, List, Sequence
+from dataclasses import asdict, dataclass, replace
+from typing import Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 
@@ -101,8 +101,30 @@ def _load_1870_baseline(path: pathlib.Path) -> Dict[str, float]:
     return out
 
 
+def _load_fertility_ratio_by_year(path: pathlib.Path) -> Dict[int, float]:
+    """Load the cited foreign-born:native-born fertility ratio by decade.
+
+    See data/fertility_by_nativity.csv for sources (Haines child-woman ratios by
+    nativity for the historical period; Census ACS / CIS and Pew/NCHS for the
+    modern period). The ratio is the non-qualifying (immigrant-descended) to
+    old-stock (native) relative fertility used to weight births each decade.
+    """
+    out: Dict[int, float] = {}
+    with open(path) as f:
+        for row in csv.DictReader(f):
+            val = row.get("fb_to_native_fertility_ratio")
+            if val:
+                out[int(row["year"])] = float(val)
+    return out
+
+
 _DECADE_CSV = _DATA_DIR / "national_decade_data.csv"
 _BASELINE_CSV = _DATA_DIR / "national_1870_baseline.csv"
+_FERTILITY_CSV = _DATA_DIR / "fertility_by_nativity.csv"
+
+FERTILITY_RATIO_BY_YEAR: Dict[int, float] = (
+    _load_fertility_ratio_by_year(_FERTILITY_CSV) if _FERTILITY_CSV.exists() else {}
+)
 
 DECADE_DATA: List[DecadeData]
 if _DECADE_CSV.exists():
@@ -156,8 +178,12 @@ class ModelParams:
     # Scales gross LPR admissions to approximate total immigrant entries.
     # >1.0 accounts for non-LPR entries (undocumented, temporary-to-permanent, etc.)
     immigration_flow_multiplier: float = 1.15
-    # Differential fertility: old-stock parents reproduce slightly below baseline,
-    # non-qualifying parents slightly above, reflecting observed patterns.
+    # Differential fertility between old-stock and immigrant-descended (non-
+    # qualifying) parents. When native_fertility_differential is True (default),
+    # the per-decade ratio is sourced from data/fertility_by_nativity.csv
+    # (Haines child-woman ratios by nativity; Census ACS/CIS; Pew/NCHS) and these
+    # two scalar multipliers are used only as a fallback when no data row exists.
+    native_fertility_differential: bool = True
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
     # Fraction of parent pairs formed by random cross-population sampling vs.
@@ -206,6 +232,19 @@ def initial_1870_qualifying_share(params: ModelParams) -> float:
         if not params.count_1870_foreign_born_as_qualifying:
             qualifying -= round(TOTAL_1870 * FOREIGN_BORN_1870_SHARE)
     return qualifying / TOTAL_1870
+
+
+def decade_fertility_multipliers(year: int, params: ModelParams) -> "tuple[float, float]":
+    """Return (old_stock, non_qualifying) fertility weights for a decade.
+
+    When ``native_fertility_differential`` is enabled and a cited ratio exists for
+    the year (data/fertility_by_nativity.csv), old-stock fertility is normalized to
+    1.0 and non-qualifying (immigrant-descended) fertility is set to the cited
+    foreign-born:native ratio. Otherwise the scalar params are used.
+    """
+    if params.native_fertility_differential and year in FERTILITY_RATIO_BY_YEAR:
+        return 1.0, FERTILITY_RATIO_BY_YEAR[year]
+    return params.old_stock_fertility_multiplier, params.nonqualifying_fertility_multiplier
 
 
 def turnover_from_tfr(tfr: float, params: ModelParams) -> float:
@@ -338,8 +377,13 @@ def simulate(params: ModelParams) -> List[YearResult]:
 
         # Carry-over: surviving residents from the previous decade
         carry = q[rng.integers(0, len(q), size=carry_n)]
-        # Births: children whose q is the midpoint of two parents
-        children = draw_parents(q, birth_n, params, rng)
+        # Births: children whose q is the midpoint of two parents. Parent
+        # selection uses the decade's cited native/immigrant fertility differential.
+        om, nm = decade_fertility_multipliers(decade.year, params)
+        decade_params = replace(
+            params, old_stock_fertility_multiplier=om, nonqualifying_fertility_multiplier=nm,
+        )
+        children = draw_parents(q, birth_n, decade_params, rng)
         # Immigrants: new entrants with no qualifying ancestry
         immigrants = np.zeros(immigrant_n, dtype=np.float64)
 
@@ -438,6 +482,9 @@ def parse_args() -> argparse.Namespace:
                              "races) as qualifying stock instead of White residents only.")
     parser.add_argument("--exclude-1870-foreign-born", action="store_true",
                         help="Do not count foreign-born residents already in the U.S. in 1870 as qualifying stock.")
+    parser.add_argument("--no-native-fertility", action="store_true",
+                        help="Disable the cited per-decade native/immigrant fertility "
+                             "differential and use the constant fallback multipliers.")
     parser.add_argument("--immigration-flow-multiplier", type=float, default=1.15,
                         help="Multiplier on gross LPR admissions (default: 1.15).")
     parser.add_argument("--old-stock-fertility", type=float, default=0.98,
@@ -461,6 +508,7 @@ def main() -> None:
         seed=args.seed,
         restrict_to_white_1870=not args.include_nonwhite_1870,
         count_1870_foreign_born_as_qualifying=not args.exclude_1870_foreign_born,
+        native_fertility_differential=not args.no_native_fertility,
         immigration_flow_multiplier=args.immigration_flow_multiplier,
         old_stock_fertility_multiplier=args.old_stock_fertility,
         nonqualifying_fertility_multiplier=args.nonqualifying_fertility,

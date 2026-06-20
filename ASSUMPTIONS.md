@@ -26,9 +26,33 @@ treatment is configurable via `--exclude-1870-foreign-born`.
 |-----------|---------|-------------|-------------|
 | `n_agents` | 300,000 | 100K-500K | Number of simulated agents |
 | `immigration_flow_multiplier` | 1.15 | 1.00-1.30 | Scales gross LPR admissions to approximate total immigrant entries |
-| `old_stock_fertility_multiplier` | 0.98 | 0.94-1.02 | Fertility weight for qualifying-ancestry parents |
-| `nonqualifying_fertility_multiplier` | 1.03 | 1.00-1.08 | Fertility weight for non-qualifying parents |
+| `native_fertility_differential` | True | on/off | Use the cited per-decade foreign-born:native fertility ratio (see below) |
+| `old_stock_fertility_multiplier` | 0.98 | 0.94-1.02 | Fallback fertility weight for qualifying parents (used only when the differential is off) |
+| `nonqualifying_fertility_multiplier` | 1.03 | 1.00-1.08 | Fallback fertility weight for non-qualifying parents (used only when the differential is off) |
 | `random_mating_rate` | 0.35 | 0.20-0.55 | Fraction of parent pairs formed randomly vs. assortatively |
+
+## Fertility differential (native-born vs. immigrant), with sources
+
+Immigrant-descended (non-qualifying) parents are weighted by the documented
+foreign-born:native-born fertility ratio for each decade, loaded from
+`data/fertility_by_nativity.csv` (not hardcoded). Old-stock fertility is
+normalized to 1.0 and the non-qualifying weight is set to the cited ratio.
+
+| Era | Foreign-born : native fertility ratio | Source |
+|-----|----------------------------------------|--------|
+| 1900–1910 | ~1.35 (white child-woman ratios: native 610 vs FB 941 in 1900; 541 vs 868 in 1910) | M.R. Haines, *Historical Statistics of the US, Millennial Edition*, Ser. Ab; Haines (2000), *Historical Methods* 33(4) |
+| 1920–2000 | ~1.33–1.34 (linear interpolation between the cited 1910 and 2008 anchors; foreign-born share small in the 1924–1965 restriction era) | Interpolated between Haines and CIS/Census anchors |
+| 2008 | 1.33 (native TFR 2.07 vs immigrant 2.75) | Camarota & Zeigler, Center for Immigration Studies (2020), Census ACS |
+| 2018 | 1.24 (native TFR 1.74 vs immigrant 2.15) | Camarota & Zeigler, CIS (2020), Census ACS; Pew Research (2016) |
+
+**Application caveat:** the cited ratios are a *first-generation* foreign-born vs.
+native differential, but the model applies them to the whole immigrant-descended
+(non-qualifying) lineage each decade. Because later immigrant generations converge
+to native fertility, this is an upper bound on fertility-driven dilution. It is
+adopted as the central case because, with it on, the model's nonblack mass share
+(~31% pre-1870) matches the Manhattan Institute's independent cohort-component
+estimate (~31% pre-1860); turning it off (`old_stock`/`nonqualifying` constants)
+raises the national majority share from ~20% to ~35%.
 
 ## State agent-based model
 
@@ -50,6 +74,7 @@ The state model uses the same agent mechanics as the national model but tracks a
 | State foreign-born, Black-alone | Census ACS 5-year (B05002, B02001) | 2022 | Used by reduced-form model only |
 | Immigration admissions | DHS/OHSS Yearbook Table 1 | 1820-2010 | Gross LPR admissions by decade |
 | Total fertility rate | Haines Ab1-10 (historical), NCHS (modern) | 1870-2020 | National TFR applied to all states |
+| Fertility by nativity | Haines (1900-10 child-woman ratios); Camarota & Zeigler / CIS, Census ACS (2008, 2018); Pew/NCHS | 1870-2020 | `data/fertility_by_nativity.csv`; foreign-born:native fertility ratio by decade |
 | 1870 White population | Census POP-WP056 / NHGIS 1870_cPAX NT4 White | 1870 | 33,589,377 (qualifying stock) |
 | 1870 Black population | Census POP-WP056 / NHGIS 1870_cPAX NT4 | 1870 | 4,880,009 (excluded) |
 | 1870 foreign-born share | Census POP-WP081 / NHGIS 1870_cPAX NT5 | 1870 | 14.4% |

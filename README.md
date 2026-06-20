@@ -22,6 +22,14 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 
 ![EC cartogram](outputs/map_hypothetical_ec_2024_cartogram.png)
 
+### Legal immigration to the United States by region of origin, 1820-2016
+
+![Immigration by region, absolute](outputs/immigration_by_region_absolute.png)
+
+![Immigration by region, share](outputs/immigration_by_region_share.png)
+
+![Immigration by region, small multiples](outputs/immigration_by_region_small_multiples.png)
+
 ## Two state-level models
 
 Both models define the qualifying ("White Heritage American") source stock as
@@ -48,6 +56,7 @@ All model inputs are loaded from CSV files in `data/`, not hardcoded:
 | `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, White, Black, AIAN, foreign-born by decade |
 | `modern_census_state_race_2000_2020.csv` | Census Bureau API (dec/sf1, dec/pl) | State-level total, Black, AIAN for 2000/2010/2020 |
 | `dhs_lpr_by_decade.csv` | DHS/OHSS Yearbook Table 1 | Gross LPR admissions by decade, 1820-2010 |
+| `fertility_by_nativity.csv` | Haines (Historical Statistics); Census ACS / CIS; Pew/NCHS | Foreign-born:native fertility ratio by decade |
 | `dhs_lpr_by_country_decade.csv` | DHS/OHSS Yearbook 2016, Table 2 (pp. 6-11) | Verbatim country-level LPR admissions by decade, 1820-2016, tagged with each row's continent and assigned world region (the auditable raw extract) |
 | `immigration_by_region_decade.csv` | Derived from `dhs_lpr_by_country_decade.csv` | LPR admissions aggregated to world region by decade; built and validated by `scripts/build_immigration_by_region.py` |
 | `state_fips_2024_electoral_votes.csv` | National Archives | State FIPS codes and 2024 EV baseline |

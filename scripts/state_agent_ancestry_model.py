@@ -42,6 +42,7 @@ import numpy as np
 from pre1870_ancestry_model import (
     DECADE_DATA,
     ModelParams as NationalModelParams,
+    decade_fertility_multipliers,
     draw_parents,
     turnover_from_tfr,
 )
@@ -166,6 +167,7 @@ class StateAgentModelParams:
     seed: int = 1870
     restrict_to_white_1870: bool = True
     immigration_flow_multiplier: float = 1.15
+    native_fertility_differential: bool = True
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
     random_mating_rate: float = 0.35
@@ -253,6 +255,7 @@ def simulate_states(
 
     rng = np.random.default_rng(params.seed)
     nat_params = NationalModelParams(
+        native_fertility_differential=params.native_fertility_differential,
         old_stock_fertility_multiplier=params.old_stock_fertility_multiplier,
         nonqualifying_fertility_multiplier=params.nonqualifying_fertility_multiplier,
         random_mating_rate=params.random_mating_rate,
@@ -303,7 +306,12 @@ def simulate_states(
         prev_year = year - 10
         tfr = decade.tfr
         turnover = turnover_from_tfr(tfr, nat_params)
-
+        # Per-decade fertility weights from the cited native/immigrant differential.
+        _om, _nm = decade_fertility_multipliers(year, nat_params)
+        decade_nat_params = replace(
+            nat_params, old_stock_fertility_multiplier=_om,
+            nonqualifying_fertility_multiplier=_nm,
+        )
         # Determine which states exist this decade
         active_states = [s for s in ALL_STATES if (year, s) in panel]
         # Register new states
@@ -383,7 +391,7 @@ def simulate_states(
                 carry_q = np.array([], dtype=np.float64)
 
             if n_births > 0 and n_state >= 2:
-                children_q = draw_parents(state_q, n_births, nat_params, rng)
+                children_q = draw_parents(state_q, n_births, decade_nat_params, rng)
             elif n_births > 0:
                 children_q = np.full(n_births, state_q.mean() if n_state > 0 else 0.0)
             else:
@@ -611,6 +619,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         help="Count all 1870 residents regardless of race (Black, "
                              "AIAN, and other races) as qualifying stock, instead of "
                              "White residents only. For sensitivity comparison.")
+    parser.add_argument("--no-native-fertility", action="store_true",
+                        help="Disable the cited per-decade native/immigrant fertility "
+                             "differential and use the constant fallback multipliers.")
     args = parser.parse_args(argv)
 
     nhgis_path = args.nhgis_panel
@@ -629,6 +640,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     params = StateAgentModelParams(
         n_agents=args.n_agents,
         restrict_to_white_1870=not args.include_nonwhite_1870,
+        native_fertility_differential=not args.no_native_fertility,
     )
 
     print(f"Running simulation with {args.n_agents:,} agents, {len(seeds)} seed(s)...")
