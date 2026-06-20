@@ -37,6 +37,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
+from scipy.interpolate import PchipInterpolator
 
 # --- Substack-style theme (matches the notebook) ---
 BG = "#F7F5F0"
@@ -129,6 +130,17 @@ def _legend_labels(regions):
     return [DISPLAY.get(r, r) for r in regions]
 
 
+def _smooth(x, series, n=500):
+    """Shape-preserving (PCHIP) interpolation onto a dense grid.
+
+    PCHIP is monotone and non-overshooting, so smoothed bands never dip below
+    zero or invent peaks the decade data doesn't support.
+    """
+    xs = np.linspace(x[0], x[-1], n)
+    out = [np.clip(PchipInterpolator(x, y)(xs), 0, None) for y in series]
+    return xs, out
+
+
 def _xaxis(ax, pivot):
     x = np.arange(len(pivot))
     ax.set_xticks(x)
@@ -143,7 +155,8 @@ def stacked_area_absolute(pivot, regions, out_path):
     x = _xaxis(ax, pivot)
     ys = [pivot[r].values / 1e6 for r in regions]
     colors = [REGION_COLORS[r] for r in regions]
-    ax.stackplot(x, ys, colors=colors, edgecolor=BG, linewidth=0.4)
+    xs, ys_s = _smooth(x, ys)
+    ax.stackplot(xs, ys_s, colors=colors, edgecolor=BG, linewidth=0.5)
 
     ax.set_ylabel("Immigrants admitted per decade")
     ax.yaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:.0f}M"))
@@ -180,10 +193,12 @@ def stacked_area_absolute(pivot, regions, out_path):
 def stacked_area_share(pivot, regions, out_path):
     fig, ax = plt.subplots(figsize=(12.5, 7))
     x = _xaxis(ax, pivot)
-    totals = pivot[regions].sum(axis=1).values
-    ys = [100.0 * pivot[r].values / totals for r in regions]
+    abs_series = [pivot[r].values.astype(float) for r in regions]
     colors = [REGION_COLORS[r] for r in regions]
-    ax.stackplot(x, ys, colors=colors, edgecolor=BG, linewidth=0.4)
+    xs, abs_s = _smooth(x, abs_series)
+    totals = np.sum(abs_s, axis=0)
+    ys = [100.0 * s / totals for s in abs_s]
+    ax.stackplot(xs, ys, colors=colors, edgecolor=BG, linewidth=0.5)
 
     ax.set_ylabel("Share of decade's immigrants (%)")
     ax.set_ylim(0, 100)
