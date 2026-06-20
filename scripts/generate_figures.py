@@ -242,12 +242,13 @@ def fig_state_map(df_state):
     plt.close(fig)
 
 
-def _pack_state_blocks(df_state, unit=1.0, gap=0.32, anchor_scale=3.2, iters=2600):
+def _pack_state_blocks(df_state, unit=1.0, gap=0.5, anchor_scale=4.0, iters=4000):
     """Lay out each state as a block of unit cells (= hypothetical EV), anchored at
-    its geographic tile position, then iteratively (a) pull each block toward its
-    anchor to preserve geography, (b) pull all blocks toward the global centroid to
-    compact the map and squeeze out empty space, and (c) remove overlaps so no two
-    blocks collide (Dorling/Demers-style cartogram)."""
+    its geographic tile position, then iteratively (a) pull each block weakly toward
+    its anchor to preserve geography and (b) remove overlaps until the layout fully
+    converges with no two blocks colliding (Demers-style cartogram). No centroid
+    gravity: that pulls blocks into overlaps faster than they can separate, which
+    leaves an ugly blob; pure overlap-resolution gives a clean, compact packing."""
     blocks = []
     for _, row in df_state.iterrows():
         abbr = row["abbr"]
@@ -265,26 +266,25 @@ def _pack_state_blocks(df_state, unit=1.0, gap=0.32, anchor_scale=3.2, iters=260
             "ax": ax_, "ay": ay_, "cx": ax_, "cy": ay_,
         })
     for _ in range(iters):
-        gx = sum(b["cx"] for b in blocks) / len(blocks)
-        gy = sum(b["cy"] for b in blocks) / len(blocks)
-        for b in blocks:
-            b["cx"] += 0.05 * (b["ax"] - b["cx"]) + 0.012 * (gx - b["cx"])
-            b["cy"] += 0.05 * (b["ay"] - b["cy"]) + 0.012 * (gy - b["cy"])
+        for b in blocks:  # weak pull toward geographic anchor
+            b["cx"] += 0.02 * (b["ax"] - b["cx"])
+            b["cy"] += 0.02 * (b["ay"] - b["cy"])
         moved = False
-        for i in range(len(blocks)):
-            for j in range(i + 1, len(blocks)):
-                a, b = blocks[i], blocks[j]
-                dx, dy = b["cx"] - a["cx"], b["cy"] - a["cy"]
-                ox = (a["w"] + b["w"]) / 2 + gap - abs(dx)
-                oy = (a["h"] + b["h"]) / 2 + gap - abs(dy)
-                if ox > 0 and oy > 0:  # axis-aligned overlap: push along least penetration
-                    if ox < oy:
-                        s = ox / 2 * (1 if dx >= 0 else -1)
-                        a["cx"] -= s; b["cx"] += s
-                    else:
-                        s = oy / 2 * (1 if dy >= 0 else -1)
-                        a["cy"] -= s; b["cy"] += s
-                    moved = True
+        for _pass in range(4):  # several separation passes per iteration for convergence
+            for i in range(len(blocks)):
+                for j in range(i + 1, len(blocks)):
+                    a, b = blocks[i], blocks[j]
+                    dx, dy = b["cx"] - a["cx"], b["cy"] - a["cy"]
+                    ox = (a["w"] + b["w"]) / 2 + gap - abs(dx)
+                    oy = (a["h"] + b["h"]) / 2 + gap - abs(dy)
+                    if ox > 0 and oy > 0:  # axis-aligned overlap: push along least penetration
+                        if ox < oy:
+                            s = ox / 2 * (1 if dx >= 0 else -1)
+                            a["cx"] -= s; b["cx"] += s
+                        else:
+                            s = oy / 2 * (1 if dy >= 0 else -1)
+                            a["cy"] -= s; b["cy"] += s
+                        moved = True
         if not moved:
             break
     return blocks
@@ -312,19 +312,22 @@ def fig_ec_cartogram(df_state):
             ax.add_patch(Rectangle((x, y), unit, unit, facecolor=color,
                                    edgecolor="white", linewidth=0.6, zorder=2))
         # Label: abbreviation, the baseline-to-hypothetical EV (actual -> hypothetical),
-        # and the absolute change, centered on the block with a white halo.
+        # and (on larger blocks) the absolute change, centered with a white halo.
         side = min(b["w"], b["h"])
-        fs_abbr = max(6.0, min(11.0, 4.6 + side * 1.5))
-        ax.text(b["cx"], b["cy"] + 0.24 * b["h"], b["abbr"], ha="center", va="center",
+        fs_abbr = max(6.5, min(11.0, 4.8 + side * 1.5))
+        big = b["rows"] >= 3  # enough height for a third label line
+        y_abbr = 0.26 * b["h"] if big else 0.18 * b["h"]
+        ax.text(b["cx"], b["cy"] + y_abbr, b["abbr"], ha="center", va="center",
                 fontsize=fs_abbr, fontweight="bold", color=SUBSTACK_TEXT, zorder=4,
                 path_effects=[pe.withStroke(linewidth=2.6, foreground="white")])
-        ax.text(b["cx"], b["cy"] - 0.02 * b["h"], f"{b['actual']}\u2192{b['ev']}",
-                ha="center", va="center", fontsize=fs_abbr * 0.82, color=SUBSTACK_TEXT,
-                zorder=4, path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
-        if b["change"] != 0:
+        ax.text(b["cx"], b["cy"] - (0.02 * b["h"] if big else 0.16 * b["h"]),
+                f"{b['actual']}\u2192{b['ev']}", ha="center", va="center",
+                fontsize=fs_abbr * 0.82, color=SUBSTACK_TEXT, zorder=4,
+                path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
+        if big and b["change"] != 0:
             sign = "+" if b["change"] > 0 else ""
             cc = SUBSTACK_ACCENT if b["change"] > 0 else SUBSTACK_BLUE
-            ax.text(b["cx"], b["cy"] - 0.28 * b["h"], f"({sign}{b['change']})", ha="center",
+            ax.text(b["cx"], b["cy"] - 0.30 * b["h"], f"({sign}{b['change']})", ha="center",
                     va="center", fontsize=fs_abbr * 0.78, fontweight="bold", color=cc, zorder=4,
                     path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
 
