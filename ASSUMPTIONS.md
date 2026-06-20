@@ -2,11 +2,23 @@
 
 ## Model definition
 
-**White Heritage American ancestry**: Descent from non-Black residents of the United States enumerated in the 1870 Census. The 1870 Census is the cutoff because it is the first post-Civil War census and the first to enumerate all residents regardless of race (though Native American enumeration remained incomplete).
+**White Heritage American ancestry**: Descent from residents enumerated as **White**
+in the 1870 Census. The 1870 Census is the cutoff because it is the first post-Civil
+War census and the first to enumerate all residents regardless of race (though Native
+American enumeration remained incomplete).
 
-**Excluded from qualifying stock**: Black Americans enumerated in 1870 (4,880,009 people, per Census POP-WP056). This is configurable via `--include-black-1870`.
+**Excluded from qualifying stock**: All non-white 1870 residents — Black Americans
+(4,880,009), American Indian/Alaska Native (25,731 enumerated), and other non-white
+races such as Chinese (~63,000) — plus all post-1870 immigrant cohorts and their
+descendants. The qualifying source stock is the enumerated **White** 1870 population
+(33,589,377; NHGIS `white` column), **not** `total − Black` (which would leave AIAN
+and other non-white residents in the stock). Counting **all** 1870 residents
+regardless of race (i.e. the full 1870 population) is available for sensitivity
+comparison via `--include-nonwhite-1870`.
 
-**Included in qualifying stock**: All other 1870 residents, including foreign-born residents already present by 1870. This is configurable via `--exclude-1870-foreign-born`.
+**Included in qualifying stock**: White residents present by 1870, including
+White foreign-born residents already in the U.S. by 1870. The foreign-born
+treatment is configurable via `--exclude-1870-foreign-born`.
 
 ## National model parameters
 
@@ -38,14 +50,15 @@ The state model uses the same agent mechanics as the national model but tracks a
 | State foreign-born, Black-alone | Census ACS 5-year (B05002, B02001) | 2022 | Used by reduced-form model only |
 | Immigration admissions | DHS/OHSS Yearbook Table 1 | 1820-2010 | Gross LPR admissions by decade |
 | Total fertility rate | Haines Ab1-10 (historical), NCHS (modern) | 1870-2020 | National TFR applied to all states |
-| 1870 Black population | Census POP-WP056 / NHGIS 1870_cPAX NT4 | 1870 | 4,880,009 |
+| 1870 White population | Census POP-WP056 / NHGIS 1870_cPAX NT4 White | 1870 | 33,589,377 (qualifying stock) |
+| 1870 Black population | Census POP-WP056 / NHGIS 1870_cPAX NT4 | 1870 | 4,880,009 (excluded) |
 | 1870 foreign-born share | Census POP-WP081 / NHGIS 1870_cPAX NT5 | 1870 | 14.4% |
 
 ## Known limitations
 
 1. **Ancestry is not directly observed**. No Census asks whether a person's ancestors were present before 1870. The model reconstructs this using population, race, nativity, immigration, and cohort assumptions.
 
-2. **Native American under-enumeration**. Native Americans were incompletely counted in early censuses. The model uses enumerated counts without correction. A sensitivity mode for corrected AIAN counts is planned but not yet implemented.
+2. **Native American treatment**. Native Americans enumerated in 1870 are excluded from the White Heritage qualifying stock (along with Black and other non-white residents), so AIAN under-enumeration in early censuses no longer biases the qualifying numerator — it only slightly affects the 1870 denominator. Early-census AIAN counts remain incomplete and politically defined.
 
 3. **Immigration data are gross admissions, not net migration**. The `immigration_flow_multiplier` parameter partially compensates, but undocumented immigration and emigration are not directly modeled.
 

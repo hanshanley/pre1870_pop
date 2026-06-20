@@ -316,7 +316,7 @@ def harmonize_records(records: Dict[Tuple[int, str], Dict]) -> List[Dict]:
     rows = []
     for (year, abbr), cols in sorted(records.items()):
         col_vals = {k: safe_int(v) for k, v in cols.items()}
-        total, black, aian, foreign_born, native_parentage = _extract_fields(year, col_vals)
+        total, white, black, aian, foreign_born, native_parentage = _extract_fields(year, col_vals)
 
         if total is not None and total > 0:
             rows.append({
@@ -325,6 +325,7 @@ def harmonize_records(records: Dict[Tuple[int, str], Dict]) -> List[Dict]:
                 "abbr": abbr,
                 "fips": MODERN_FIPS.get(abbr, ""),
                 "total": total,
+                "white": white,
                 "black": black,
                 "aian": aian,
                 "foreign_born": foreign_born,
@@ -335,13 +336,17 @@ def harmonize_records(records: Dict[Tuple[int, str], Dict]) -> List[Dict]:
 
 
 def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
-    Optional[int], Optional[int], Optional[int], Optional[int], Optional[int]
+    Optional[int], Optional[int], Optional[int], Optional[int], Optional[int], Optional[int]
 ]:
-    """Extract total, black, aian, foreign_born, native_parentage from NHGIS columns.
+    """Extract total, white, black, aian, foreign_born, native_parentage from NHGIS columns.
 
     Column codes are specific to this extract and were verified against codebooks.
+    The enumerated White count is captured so downstream models can define the
+    "White Heritage" source stock directly (excluding Black, AIAN, and other
+    non-white races) rather than approximating it as total minus Black.
     """
     total = None
+    white = None
     black = None
     aian = None
     foreign_born = None
@@ -350,6 +355,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
     if year == 1790:
         # AAA001: Total | AAQ001: Non-White Free | AAQ002: Non-White Slave | AAQ003: White
         total = _g(c, "AAA001")
+        white = _g(c, "AAQ003")
         black = _sum(c, "AAQ001", "AAQ002")  # free + slave = total non-white (mostly Black)
 
     elif year == 1800:
@@ -368,6 +374,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # ABN001: Total (from NT1) | AB1001: Total (from NT9 — foreigners not naturalized)
         # ABP001: White | ABP002: Non-white
         total = _g(c, "ABN001")
+        white = _g(c, "ABP001")
         black = _g(c, "ABP002")
         foreign_born = _g(c, "AB1001")
 
@@ -379,6 +386,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # ADQ001: Total | AE6001: White | AE6002: Nonwhite Free | AE6003: Nonwhite Slave
         # AEM001: Born out of state | AEM002: Born out of country
         total = _g(c, "ADQ001")
+        white = _g(c, "AE6001")
         black = _sum(c, "AE6002", "AE6003")
         foreign_born = _g(c, "AEM002")
 
@@ -387,6 +395,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # AH3004: Indian | AH3005: Half breed | AH3006: Asiatic
         # AH6001: Native-born | AH6002: Foreign-born
         total = _g(c, "AG3001")
+        white = _g(c, "AH3001")
         black = _sum(c, "AH3002", "AH3003")
         aian = _sum(c, "AH3004", "AH3005")
         foreign_born = _g(c, "AH6002")
@@ -395,6 +404,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # AJ3001: Total | AK3001: White | AK3002: Colored | AK3003: Chinese | AK3004: Indian
         # ALB001: Native-born | ALB002: Foreign-born
         total = _g(c, "AJ3001")
+        white = _g(c, "AK3001")
         black = _g(c, "AK3002")
         aian = _g(c, "AK3004")
         foreign_born = _g(c, "ALB002")
@@ -403,6 +413,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # AOT001: Total | APP001: White | APP002: Colored | APP003: Chinese | APP004: Indian
         # AP4001: Native-born | AP4002: Foreign-born
         total = _g(c, "AOT001")
+        white = _g(c, "APP001")
         black = _g(c, "APP002")
         aian = _g(c, "APP004")
         foreign_born = _g(c, "AP4002")
@@ -415,6 +426,8 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         black = _g(c, "AVF001")
         aian = _g(c, "AVF010")
         foreign_born = _sum(c, "AVP003", "AVP004")
+        # No reliable direct White code in this extract; leave white unset rather
+        # than derive it from an uncertain race breakdown.
 
     elif year == 1900:
         # AYM001: Total
@@ -424,6 +437,8 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         total = _g(c, "AYM001")
         black = _sum(c, "AZ3003", "AZ3004")
         foreign_born = _sum(c, "AZF003", "AZF004")
+        # No reliable direct White code in this extract; leave white unset rather
+        # than derive it from an uncertain race breakdown.
 
     elif year == 1910:
         # A3Y001: Total (1910) | A3Y002: Total (1900)
@@ -431,6 +446,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # A5B003: Native-born mixed parentage | A5B004: Foreign-born
         # A30001: White Male | A30002: White Female | A30003: Negro Male | A30004: Negro Female
         total = _g(c, "A3Y001")
+        white = _sum(c, "A30001", "A30002")
         black = _sum(c, "A30003", "A30004")
         foreign_born = _g(c, "A5B004")
         native_parentage = _g(c, "A5B001")
@@ -441,6 +457,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # A8L005: Negro Male | A8L006: Negro Female
         # A8V001: Native parentage | A8V002: Foreign parentage | A8V003: Mixed parentage
         total = _g(c, "A7L001")
+        white = _sum(c, "A8L001", "A8L002", "A8L003", "A8L004")
         black = _sum(c, "A8L005", "A8L006")
         foreign_born = _sum(c, "A8L003", "A8L004")
         native_parentage = _g(c, "A8V001")
@@ -451,6 +468,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # BEP005: Negro Male | BEP006: Negro Female
         # BE8001: Native parentage | BE8002: Foreign parentage | BE8003: Mixed
         total = _g(c, "BDP001")
+        white = _sum(c, "BEP001", "BEP002", "BEP003", "BEP004")
         black = _sum(c, "BEP005", "BEP006")
         foreign_born = _sum(c, "BEP003", "BEP004")
         native_parentage = _g(c, "BE8001")
@@ -460,6 +478,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # BXY001-4: Native M, Native F, FB M, FB F
         # BYA001: White native | BYA002: White FB | BYA003: Negro | BYA004: Other
         total = _g(c, "BV7001")
+        white = _sum(c, "BYA001", "BYA002")
         black = _g(c, "BYA003")
         foreign_born = _sum(c, "BXY003", "BXY004")
 
@@ -469,6 +488,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # B4J001: Native-born | B4J002: Foreign-born
         total = _sum(c, "B3P001", "B3P002", "B3P003", "B3P004",
                         "B3P005", "B3P006", "B3P007", "B3P008")
+        white = _sum(c, "B3P001", "B3P002", "B3P005", "B3P006")
         black = _sum(c, "B3P003", "B3P007")
         foreign_born = _g(c, "B4J002")
 
@@ -477,6 +497,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         # B5S001-14: Sex by Race (M White, M Negro, M Indian, M Japanese, M Chinese,
         #            M Filipino, M Other, F White, F Negro, F Indian, ...)
         total = _g(c, "B5O001")
+        white = _sum(c, "B5S001", "B5S008")
         black = _sum(c, "B5S002", "B5S009")
         aian = _sum(c, "B5S003", "B5S010")
         # B5V001 is foreign stock, not foreign-born. No pure FB table in this extract.
@@ -490,12 +511,14 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
                             "CEB015", "CEB016", "CEB017", "CEB018")
         if total_100:
             total = total_100
+            white = _sum(c, "CEB001", "CEB010")
             black = _sum(c, "CEB002", "CEB011")
             aian = _sum(c, "CEB003", "CEB012")
         else:
             # Fallback to sample-based (1970_Cnt4Pa)
             # C0X001: White | C0X002: Negro | C0X003: Other
             total = _sum(c, "C0X001", "C0X002", "C0X003")
+            white = _g(c, "C0X001")
             black = _g(c, "C0X002")
         # C0Z001: Native-born | C0Z002: Foreign-born (from sample data)
         foreign_born = _g(c, "C0Z002")
@@ -506,6 +529,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         total_pl = _sum(c, "C6X001", "C6X002", "C6X003", "C6X004", "C6X005")
         if total_pl:
             total = total_pl
+            white = _g(c, "C6X001")
             black = _g(c, "C6X002")
             aian = _g(c, "C6X003")
         else:
@@ -514,6 +538,7 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
             total_race = _sum(c, "C9G001", "C9G002", "C9G003", "C9G004")
             if total_race:
                 total = total_race
+            white = _g(c, "C9G001")
             black = _g(c, "C9G002")
             aian = _g(c, "C9G003")
         # From STF4Pa (ds110): DV0001-3: Nativity/Citizenship
@@ -528,15 +553,16 @@ def _extract_fields(year: int, c: Dict[str, Optional[int]]) -> Tuple[
         total_race = _sum(c, "EUY001", "EUY002", "EUY003", "EUY004", "EUY005")
         if total_race:
             total = total_race
+        white = _g(c, "EUY001")
         black = _g(c, "EUY002")
         aian = _g(c, "EUY003")
         foreign_born = _sum(c, "E3N006", "E3N007", "E3N008", "E3N009")
 
-    return total, black, aian, foreign_born, native_parentage
+    return total, white, black, aian, foreign_born, native_parentage
 
 
 def write_panel_csv(rows: List[Dict], path: pathlib.Path) -> None:
-    fields = ["year", "state", "abbr", "fips", "total", "black", "aian",
+    fields = ["year", "state", "abbr", "fips", "total", "white", "black", "aian",
               "foreign_born", "native_parentage"]
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as f:
@@ -565,8 +591,18 @@ def validate_panel(rows: List[Dict]) -> None:
         n_states = len(yr_rows)
         has_black = sum(1 for r in yr_rows if r.get("black") is not None)
         has_fb = sum(1 for r in yr_rows if r.get("foreign_born") is not None)
+        has_white = sum(1 for r in yr_rows if r.get("white") is not None)
+        white_tot = sum(r["white"] for r in yr_rows if r.get("white"))
         print(f"  {y}: {n_states} states, total_pop={tot:,}, "
+              f"has_white={has_white}, white_pop={white_tot:,}, "
               f"has_black={has_black}, has_foreign_born={has_fb}")
+
+    # Race subtotals must never exceed the total population.
+    for r in rows:
+        for part in ("white", "black", "aian"):
+            v = r.get(part)
+            if v is not None and r["total"] and v > r["total"]:
+                print(f"  WARNING: {r['year']} {r['abbr']} {part}={v} exceeds total={r['total']}")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────

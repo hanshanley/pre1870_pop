@@ -13,19 +13,32 @@ stayed in that state since 1870. Internal migration matters: a person in Arizona
 descend from colonial Virginia, and a person in Massachusetts may have recent
 immigrant ancestry.
 
-Default definition
-------------------
+Definition and scope
+--------------------
+This reduced-form method (Method A) is an APPROXIMATION of the White Heritage
+American share. It targets the same White-only definition as the agent model
+(Method B), but does so heuristically: it removes modern Black-alone residents
+explicitly and absorbs the remaining non-white / non-old-stock population
+(AIAN, Asian, Hispanic-identifying, recent migrants) into the hand-set
+per-state ``old_stock_factor`` rather than via an explicit race subtraction.
+Because the factor already encodes those populations, this script does NOT add a
+separate AIAN/other-race exclusion (doing so would double-count). For the clean,
+explicit White-only exclusion use ``state_agent_ancestry_model.py`` (Method B),
+which is the method behind the headline state map and EC cartogram.
+
 - Denominator: all current state residents.
-- Qualifying ancestry: non-Black U.S. resident source stock present by 1870.
-- Excluded ancestry: Black American source stock present by 1870. In the state model,
-  modern Black-alone residents are also assigned zero qualifying pre-1870 ancestry by
+- Qualifying ancestry: White U.S. resident source stock present by 1870
+  (approximated; see above).
+- Excluded ancestry: Black American source stock present by 1870. Modern
+  Black-alone residents are assigned zero qualifying pre-1870 ancestry by
   default. Adjustable with --black-exclusion-weight.
 
 The model approximates state-level ancestry shares using:
 1. Current foreign-born share by state (immigration-stock proxy).
 2. A second-generation proxy inferred from the foreign-born share.
 3. Modern Black-alone share by state (exclusion adjustment).
-4. A state/region old-stock factor (historical settlement and internal migration).
+4. A state/region old-stock factor (historical settlement, internal migration,
+   and residual non-white / non-old-stock population).
 5. A fertility factor (demographic persistence).
 6. National calibration anchors from the companion national model.
 

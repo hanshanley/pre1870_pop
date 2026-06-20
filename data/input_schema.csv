@@ -6,7 +6,9 @@ data/modern_census_state_race_2000_2020.csv,aian_alone,American Indian and Alask
 data/nhgis_historical_state_panel_1790_1990.csv,year,Decennial census year
 data/nhgis_historical_state_panel_1790_1990.csv,state,State name
 data/nhgis_historical_state_panel_1790_1990.csv,abbr,State abbreviation
+data/nhgis_historical_state_panel_1790_1990.csv,fips,Two-digit state FIPS code
 data/nhgis_historical_state_panel_1790_1990.csv,total,Total state population
+data/nhgis_historical_state_panel_1790_1990.csv,white,"Enumerated White population count (qualifying White Heritage source stock); blank for years/states without a race breakdown"
 data/nhgis_historical_state_panel_1790_1990.csv,black,"Black population count, harmonized to source availability"
 data/nhgis_historical_state_panel_1790_1990.csv,aian,American Indian / Alaska Native count or correction estimate
 data/nhgis_historical_state_panel_1790_1990.csv,foreign_born,Foreign-born count where available

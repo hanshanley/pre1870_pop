@@ -4,13 +4,13 @@
 
 This project estimates a counterfactual:
 
-> What would the Electoral College allocation look like if the census counted only people descended from U.S. residents who were already in the United States by roughly 1870?
+> What would the Electoral College allocation look like if the census counted only people descended from **White** U.S. residents who were already in the United States by roughly 1870?
 
 The model is **not** a party-vote forecast. It does not estimate how anyone would vote. It is an apportionment exercise: construct a hypothetical counted population by state, reapportion the 435 House seats using the standard equal-proportions method, and then compute electoral votes as House seats plus two Senate electors per state.
 
 The project has two layers:
 
-1. **Ancestry-stock layer:** estimate the population in each state that belongs to the pre-1870 ancestry stock.
+1. **Ancestry-stock layer:** estimate the population in each state that descends from the pre-1870 **White** resident stock (Black, AIAN, and other non-white 1870 residents are excluded from the qualifying stock).
 2. **Electoral College layer:** use the modeled counted population as the apportionment population.
 
 The current package contains the data acquisition layer, static inputs, existing state-estimate outputs, and the Electoral College reapportionment script.
@@ -19,31 +19,40 @@ The current package contains the data acquisition layer, static inputs, existing
 
 ## 2. Key definitions
 
-### 2.1 Pre-1870 stock
+### 2.1 Pre-1870 White Heritage stock
 
-Let $S_{s,t}$ denote the modeled population in state $s$ at time $t$ whose ancestry descends from people resident in the United States before the 1870 cutoff.
+Let $S_{s,t}$ denote the modeled population in state $s$ at time $t$ whose ancestry
+descends from **White** people resident in the United States before the 1870 cutoff.
 
-In the updated definition requested here, the pre-1870 stock includes:
+The qualifying ("White Heritage American") source stock is defined as residents
+enumerated as **White** in the 1870 Census:
 
 $$
-\text{pre-1870 resident stock}
+\text{pre-1870 White Heritage stock}
 =
-\text{White/European-origin resident stock}
-+
-\text{Black resident stock}
-+
-\text{Native American / Alaska Native resident stock}
-+
-\text{other resident stock present by the cutoff}
+\text{White/European-origin resident stock present by the 1870 cutoff}
 $$
 
-It excludes:
+It **excludes** every non-white 1870 race group, as well as later arrivals:
 
 $$
-\text{post-1870 immigrant-entry cohorts and their descendants}
+\text{excluded}
+=
+\underbrace{\text{Black resident stock}}_{\text{enumerated 1870}}
++
+\underbrace{\text{Native American / Alaska Native stock}}_{\text{enumerated 1870}}
++
+\underbrace{\text{other non-white stock (e.g. Chinese)}}_{\text{enumerated 1870}}
++
+\underbrace{\text{post-1870 immigrant-entry cohorts and their descendants}}_{}
 $$
 
-This is a modeling definition, not a directly measured Census category.
+Operationally the source stock is the **enumerated White count** for 1870 (NHGIS
+`white` column / Census POP-WP056), not `total − Black`. Using `total − Black`
+would incorrectly retain Native American and other non-white residents (material
+in western states such as California, where ~10% of the 1870 population was
+Chinese or AIAN). This is a modeling definition, not a directly measured Census
+category for present-day people.
 
 ### 2.2 Cutoff
 
@@ -131,7 +140,7 @@ data/nhgis_historical_state_panel_1790_1990.csv
 Expected columns:
 
 ```text
-year,state,abbr,total,black,aian,foreign_born,native_parentage
+year,state,abbr,fips,total,white,black,aian,foreign_born,native_parentage
 ```
 
 Minimum required columns:
@@ -140,7 +149,10 @@ Minimum required columns:
 year,state,abbr,total
 ```
 
-The model improves when `black`, `aian`, `foreign_born`, and `native_parentage` are present.
+The model improves when `white`, `black`, `aian`, `foreign_born`, and
+`native_parentage` are present. The agent model seeds the 1870 qualifying stock
+from the `white` column; when `white` is missing for a state-year it falls back
+to a `total − black` approximation.
 
 ### 3.3 Immigration data
 
@@ -212,15 +224,21 @@ M_{1790}^{\text{AIAN}}(1790),
 M_{1790}^{\text{Other}}(1790)
 $$
 
-The updated inclusion policy counts Black and Native American pre-1870 stock:
+The implementation initializes the cohort at the **1870 baseline**, assigning
+qualifying status $q=1$ only to the share of the 1870 population enumerated as
+**White** (`initial_1870_qualifying_share` $= \text{WHITE}_{1870}/\text{TOTAL}_{1870}$),
+and $q=0$ to Black, AIAN, other non-white residents, and all later immigrant
+cohorts:
 
 $$
 \text{counted}_{t}
 =
-\sum_{c \leq 1860} M_c(t)
-+
-\text{corrected AIAN pre-1870 stock if not already represented}
+\sum_{c \leq 1860} M_c^{\text{White}}(t)
 $$
+
+where $M_c^{\text{White}}$ tracks only descendants of the White pre-1870 source
+stock. Black, AIAN, and other non-white 1870 residents are **excluded** from the
+qualifying stock (they remain in the denominator $P_t$).
 
 Post-1870 immigrant cohorts are not counted as pre-1870 stock:
 
@@ -326,11 +344,15 @@ q_s
 f(\text{foreign-born share}_s,\ \text{Black share}_s,\ \text{AIAN share}_s,\ \text{old-stock factor}_s,\ \text{fertility factor}_s)
 $$
 
-The updated preferred approach is:
+The updated preferred approach (implemented in `state_agent_ancestry_model.py`,
+Method B) is:
 
-1. Use real historical state total/race/nativity data from NHGIS.
-2. Treat Black and Native American pre-1870 stock as included.
-3. Use post-1870 immigrant-origin cohorts to subtract from total resident stock.
+1. Use real historical state total/race/nativity data from NHGIS, including the
+   enumerated **White** count per state-decade.
+2. Seed the 1870 qualifying stock from the **White** share only — Black, AIAN, and
+   other non-white 1870 residents are excluded (they remain in the denominator).
+3. Add post-1870 immigrant cohorts with $q=0$ so they and their descendants are
+   not counted as White Heritage stock.
 4. Run sensitivity scenarios for Native under-enumeration and net immigration.
 
 ---
@@ -443,9 +465,11 @@ The package performs or recommends these checks:
 2. The 50 states receive exactly 435 House seats.
 3. DC is either fixed at 3 electors or explicitly excluded.
 4. State populations sum close to national Census totals.
-5. Race subtotals do not exceed total population.
-6. Counted population satisfies: $0 \leq C_s \leq P_s$.
-7. National counted share is plausible under sensitivity bounds.
+5. Race subtotals do not exceed total population (`white`, `black`, `aian` each $\leq$ `total`).
+6. The 1870 White stock excludes Black, AIAN, and other non-white races: nationally
+   $\text{WHITE}_{1870} \approx 33.59\text{M}$ (not $\text{total} - \text{black} = 33.68\text{M}$).
+7. Counted population satisfies: $0 \leq C_s \leq P_s$.
+8. National counted share is plausible under sensitivity bounds.
 
 ---
 
@@ -455,9 +479,14 @@ The package performs or recommends these checks:
 
 No Census asks whether a person's ancestors were present before 1870. The model reconstructs that using population, race, nativity, immigration, and cohort assumptions.
 
-### 10.2 Native American under-enumeration
+### 10.2 Native American treatment
 
-Native American population counts before the late nineteenth century are incomplete and politically defined. This is why the package treats Native inclusion as a correction/sensitivity problem.
+Native Americans enumerated in 1870 are **excluded** from the White Heritage
+qualifying stock (as are Black and other non-white residents). Because they are
+excluded rather than counted, the historical under-enumeration of "Indians not
+taxed" no longer biases the qualifying numerator; it only affects the 1870
+denominator slightly. Census AIAN counts before the late nineteenth century are
+nonetheless incomplete and politically defined.
 
 ### 10.3 Immigration data are not net migration
 

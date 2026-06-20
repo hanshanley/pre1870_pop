@@ -24,11 +24,16 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 
 ## Two state-level models
 
+Both models define the qualifying ("White Heritage American") source stock as
+residents enumerated as **White** in the 1870 Census — Black, American Indian /
+Alaska Native, and other non-white (e.g. Chinese) 1870 residents are excluded from
+the qualifying stock but remain in the present-day denominator.
+
 The project implements two independent approaches to state-level estimation:
 
-**Method A — Reduced-form model** (`state_pre1870_ancestry_model.py`): Uses ACS foreign-born and Black-alone shares with calibration to national anchors. Fast but relies on hand-set `old_stock_factor` priors per state.
+**Method A — Reduced-form model** (`state_pre1870_ancestry_model.py`): Uses ACS foreign-born and Black-alone shares with calibration to national anchors. Fast but relies on hand-set `old_stock_factor` priors per state, which also absorb residual non-white / non-old-stock population (it does not subtract AIAN/other races explicitly).
 
-**Method B — Agent-based simulation** (`state_agent_ancestry_model.py`): Runs 300K agents through 1870-2020 using historical Census data from NHGIS (population, race, and nativity by state per decade). State differences emerge from the simulation — no hand-set factors.
+**Method B — Agent-based simulation** (`state_agent_ancestry_model.py`): Runs 300K agents through 1870-2020 using historical Census data from NHGIS (population, race, and nativity by state per decade). The 1870 qualifying stock is seeded from each state's enumerated **White** share (excluding Black, AIAN, and other races); state differences emerge from the simulation — no hand-set factors. This is the method behind the headline state map and EC cartogram.
 
 The notebook runs both and compares results.
 
@@ -39,10 +44,12 @@ All model inputs are loaded from CSV files in `data/`, not hardcoded:
 | File | Source | Content |
 |------|--------|---------|
 | `national_decade_data.csv` | Census POP-WP056, DHS Yearbook, Haines, NCHS | National population, foreign-born share, TFR, LPR admissions by decade |
-| `national_1870_baseline.csv` | Census POP-WP056, NHGIS 1870_cPAX | 1870 total population, Black population, foreign-born share |
-| `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, Black, AIAN, foreign-born by decade |
+| `national_1870_baseline.csv` | Census POP-WP056, NHGIS 1870_cPAX | 1870 total population, White population (qualifying stock), Black population, foreign-born share |
+| `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, White, Black, AIAN, foreign-born by decade |
 | `modern_census_state_race_2000_2020.csv` | Census Bureau API (dec/sf1, dec/pl) | State-level total, Black, AIAN for 2000/2010/2020 |
 | `dhs_lpr_by_decade.csv` | DHS/OHSS Yearbook Table 1 | Gross LPR admissions by decade, 1820-2010 |
+| `immigration_by_region_decade.csv` | DHS/OHSS Yearbook 2016 Table 2 | LPR admissions by world region of last residence, by decade, 1820-2016 |
+| `dhs_lpr_by_country_decade.csv` | DHS/OHSS Yearbook 2016 Table 2 | Country-level LPR admissions by decade (source detail for the regional file) |
 | `state_fips_2024_electoral_votes.csv` | National Archives | State FIPS codes and 2024 EV baseline |
 
 ## Project structure
@@ -125,6 +132,15 @@ python scripts/hypothetical_ec_reapportionment.py \
 export CENSUS_API_KEY="your_census_key"
 jupyter notebook notebooks/old_stock_analysis.ipynb
 ```
+
+### 7. Plot immigration by world region of origin
+
+```bash
+python scripts/plot_immigration_by_region.py
+```
+
+Generates stacked-area, share, and small-multiples charts of legal immigration
+by region of last residence (1820-2016) in `outputs/`.
 
 ## Safe key handling
 

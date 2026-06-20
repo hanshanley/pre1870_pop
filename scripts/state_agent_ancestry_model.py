@@ -5,6 +5,15 @@ state_agent_ancestry_model.py
 State-level agent-based ancestry simulation. Extends the national model's
 mechanics to run per-state with historical Census data as anchors.
 
+Definition
+----------
+The qualifying ("White Heritage American") source stock is the population
+enumerated as WHITE in the 1870 Census. Black, American Indian/Alaska Native,
+and other non-white (e.g. Chinese) 1870 residents are excluded from the source
+stock but remain in the modern denominator. The 1870 White share is read from
+the NHGIS panel ``white`` column; see ``--include-nonwhite-1870`` for the legacy
+non-Black sensitivity variant.
+
 Unlike the reduced-form state model (state_pre1870_ancestry_model.py), this
 model does not use hand-set old_stock_factor or fertility_factor values. Instead
 it tracks individual agents with ancestry fractions (q values) across states,
@@ -49,6 +58,7 @@ class StateDecadeData:
     year: int
     abbr: str
     total: int
+    white: Optional[int]
     black: Optional[int]
     foreign_born: Optional[int]
 
@@ -64,6 +74,7 @@ def load_nhgis_panel(path: pathlib.Path) -> Dict[Tuple[int, str], StateDecadeDat
                 year=year,
                 abbr=abbr,
                 total=int(row["total"]),
+                white=int(row["white"]) if row.get("white") else None,
                 black=int(row["black"]) if row.get("black") else None,
                 foreign_born=int(row["foreign_born"]) if row.get("foreign_born") else None,
             )
@@ -94,7 +105,7 @@ def load_modern_census(path: pathlib.Path) -> Dict[Tuple[int, str], StateDecadeD
             else:
                 black = None
             out[(year, abbr)] = StateDecadeData(
-                year=year, abbr=abbr, total=total, black=black, foreign_born=None,
+                year=year, abbr=abbr, total=total, white=None, black=black, foreign_born=None,
             )
     return out
 
@@ -153,7 +164,7 @@ MODERN_FIPS = {
 class StateAgentModelParams:
     n_agents: int = 300_000
     seed: int = 1870
-    exclude_black_1870: bool = True
+    restrict_to_white_1870: bool = True
     immigration_flow_multiplier: float = 1.15
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
@@ -181,6 +192,20 @@ def get_state_black_share(
     if key in panel and panel[key].black is not None and panel[key].total > 0:
         return panel[key].black / panel[key].total
     return 0.0
+
+
+def get_state_white_share(
+    panel: Dict[Tuple[int, str], StateDecadeData], year: int, abbr: str
+) -> Optional[float]:
+    """Share of a state's population enumerated as White in a given year.
+
+    Returns None when no enumerated White count is available, so callers can
+    fall back to a non-Black approximation.
+    """
+    key = (year, abbr)
+    if key in panel and panel[key].white is not None and panel[key].total > 0:
+        return panel[key].white / panel[key].total
+    return None
 
 
 def get_state_fb_share(
@@ -255,9 +280,14 @@ def simulate_states(
 
         black_share = get_state_black_share(panel, 1870, abbr)
         fb_share = get_state_fb_share(panel, 1870, abbr)
+        white_share = get_state_white_share(panel, 1870, abbr)
 
-        if params.exclude_black_1870:
-            qualifying_share = 1.0 - black_share
+        if params.restrict_to_white_1870:
+            # White Heritage source stock: only residents enumerated as White in
+            # 1870 qualify. This excludes Black, AIAN, and other non-white races.
+            # Fall back to the non-Black approximation only if no White count
+            # exists for the state-year.
+            qualifying_share = white_share if white_share is not None else (1.0 - black_share)
         else:
             qualifying_share = 1.0
 
@@ -574,8 +604,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         default=DATA_DIR / "nhgis_historical_state_panel_1790_1990.csv")
     parser.add_argument("--modern-census", type=pathlib.Path,
                         default=DATA_DIR / "modern_census_state_race_2000_2020.csv")
-    parser.add_argument("--exclude-black-1870", action="store_true", default=True)
-    parser.add_argument("--include-black-1870", action="store_true")
+    parser.add_argument("--restrict-to-white-1870", action="store_true", default=True,
+                        help="Restrict the 1870 source stock to enumerated White "
+                             "residents (excludes Black, AIAN, and other races).")
+    parser.add_argument("--include-nonwhite-1870", action="store_true",
+                        help="Count all 1870 residents regardless of race (Black, "
+                             "AIAN, and other races) as qualifying stock, instead of "
+                             "White residents only. For sensitivity comparison.")
     args = parser.parse_args(argv)
 
     nhgis_path = args.nhgis_panel
@@ -593,7 +628,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     seeds = [int(s) for s in args.seeds.split(",")]
     params = StateAgentModelParams(
         n_agents=args.n_agents,
-        exclude_black_1870=not args.include_black_1870,
+        restrict_to_white_1870=not args.include_nonwhite_1870,
     )
 
     print(f"Running simulation with {args.n_agents:,} agents, {len(seeds)} seed(s)...")

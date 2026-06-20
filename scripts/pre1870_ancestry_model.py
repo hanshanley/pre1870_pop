@@ -7,11 +7,13 @@ population whose ancestry traces to people living in the United States before 18
 
 Overview
 --------
-The default model excludes Black Americans enumerated in 1870 from the qualifying
-pre-1870 source stock, while keeping modern Black Americans in the denominator. That
-means Black pre-1870 ancestry lines are assigned 0 qualifying ancestry, but a
-present-day person can still have qualifying ancestry through other pre-1870 non-Black
-ancestors. This is a configurable flag (--include-black-1870).
+The default model defines the qualifying pre-1870 source stock as residents
+enumerated as WHITE in the 1870 Census. This excludes Black, American Indian /
+Alaska Native, and other non-white (e.g. Chinese) residents from the qualifying
+stock, while keeping the entire modern population in the denominator. A present-day
+person therefore carries qualifying ("White Heritage American") ancestry only
+through White pre-1870 ancestors. The non-white exclusion is a configurable flag
+(--include-nonwhite-1870).
 
 This is a reduced-form demographic ancestry model. It is not a definitive genealogical
 claim. The Census does not directly observe whether a present-day person has any or
@@ -39,7 +41,7 @@ Usage
     python scripts/pre1870_ancestry_model.py
     python scripts/pre1870_ancestry_model.py --json
     python scripts/pre1870_ancestry_model.py --sensitivity
-    python scripts/pre1870_ancestry_model.py --include-black-1870
+    python scripts/pre1870_ancestry_model.py --include-nonwhite-1870
 
 Requires: Python 3.9+, numpy.
 """
@@ -129,10 +131,12 @@ if _BASELINE_CSV.exists():
     _baseline = _load_1870_baseline(_BASELINE_CSV)
     TOTAL_1870 = int(_baseline["total_1870"])
     BLACK_1870 = int(_baseline["black_1870"])
+    WHITE_1870 = int(_baseline["white_1870"]) if "white_1870" in _baseline else TOTAL_1870 - BLACK_1870
     FOREIGN_BORN_1870_SHARE = _baseline["foreign_born_1870_share"]
 else:
     TOTAL_1870 = 38_558_371
     BLACK_1870 = 4_880_009
+    WHITE_1870 = 33_589_377
     FOREIGN_BORN_1870_SHARE = 0.144
 
 
@@ -147,7 +151,7 @@ class ModelParams:
     """
     n_agents: int = 300_000
     seed: int = 1870
-    exclude_black_1870_from_qualifying_stock: bool = True
+    restrict_to_white_1870: bool = True
     count_1870_foreign_born_as_qualifying: bool = True
     # Scales gross LPR admissions to approximate total immigrant entries.
     # >1.0 accounts for non-LPR entries (undocumented, temporary-to-permanent, etc.)
@@ -185,14 +189,22 @@ class YearResult:
 def initial_1870_qualifying_share(params: ModelParams) -> float:
     """Compute the share of the 1870 population assigned qualifying ancestry (q=1).
 
-    By default, the Black population is excluded (q=0) and foreign-born residents
-    are included (q=1). Both are configurable via model parameters.
+    By default the qualifying source stock is the population enumerated as White
+    in 1870, which excludes Black, American Indian/Alaska Native, and other
+    non-white (e.g. Chinese) residents. Foreign-born residents already present by
+    1870 are included unless ``count_1870_foreign_born_as_qualifying`` is False,
+    in which case an approximate White foreign-born mass is also removed.
     """
-    qualifying = TOTAL_1870
-    if params.exclude_black_1870_from_qualifying_stock:
-        qualifying -= BLACK_1870
-    if not params.count_1870_foreign_born_as_qualifying:
-        qualifying -= round(TOTAL_1870 * FOREIGN_BORN_1870_SHARE)
+    if params.restrict_to_white_1870:
+        qualifying = WHITE_1870
+        # Approximate White foreign-born using the overall 1870 FB share. This is
+        # a sensitivity knob; non-white FB are already excluded from WHITE_1870.
+        if not params.count_1870_foreign_born_as_qualifying:
+            qualifying -= round(WHITE_1870 * FOREIGN_BORN_1870_SHARE)
+    else:
+        qualifying = TOTAL_1870
+        if not params.count_1870_foreign_born_as_qualifying:
+            qualifying -= round(TOTAL_1870 * FOREIGN_BORN_1870_SHARE)
     return qualifying / TOTAL_1870
 
 
@@ -421,8 +433,9 @@ def parse_args() -> argparse.Namespace:
                         help="Number of agents in the simulation (default: 300,000).")
     parser.add_argument("--seed", type=int, default=1870,
                         help="Random seed for reproducibility.")
-    parser.add_argument("--include-black-1870", action="store_true",
-                        help="Count the Black population enumerated in 1870 as qualifying pre-1870 stock.")
+    parser.add_argument("--include-nonwhite-1870", action="store_true",
+                        help="Count all 1870 residents (including Black, AIAN, and other "
+                             "races) as qualifying stock instead of White residents only.")
     parser.add_argument("--exclude-1870-foreign-born", action="store_true",
                         help="Do not count foreign-born residents already in the U.S. in 1870 as qualifying stock.")
     parser.add_argument("--immigration-flow-multiplier", type=float, default=1.15,
@@ -446,7 +459,7 @@ def main() -> None:
     params = ModelParams(
         n_agents=args.n_agents,
         seed=args.seed,
-        exclude_black_1870_from_qualifying_stock=not args.include_black_1870,
+        restrict_to_white_1870=not args.include_nonwhite_1870,
         count_1870_foreign_born_as_qualifying=not args.exclude_1870_foreign_born,
         immigration_flow_multiplier=args.immigration_flow_multiplier,
         old_stock_fertility_multiplier=args.old_stock_fertility,
@@ -469,8 +482,8 @@ def main() -> None:
         print_table(results)
         final = results[-1]
         print("\n2020 point estimate:")
-        print(f"  Average qualifying pre-1870 non-Black ancestry: {pct(final.average_qualifying_ancestry)}")
-        print(f"  Has any qualifying pre-1870 non-Black ancestor: {pct(final.any_qualifying_ancestor_share)}")
+        print(f"  Average qualifying pre-1870 White ancestry: {pct(final.average_qualifying_ancestry)}")
+        print(f"  Has any qualifying pre-1870 White ancestor: {pct(final.any_qualifying_ancestor_share)}")
         print(f"  Has primary/majority qualifying ancestry: {pct(final.primary_qualifying_ancestry_share)}")
 
     if args.sensitivity:
