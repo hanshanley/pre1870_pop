@@ -95,18 +95,26 @@ REGION_COLORS = {
     "Other & not specified": "#B5AFA6",
 }
 
-# Self-documenting legend labels (the source only itemizes certain countries).
+# Self-documenting legend labels. The 1820-2016 source itemizes only 13 Asian
+# countries, so the Asian bands are labeled by exactly what they contain and the
+# non-itemized remainder is the source's own "Other Asia" aggregate.
 DISPLAY = {
     "East Asia": "East Asia (China, Japan, Korea, Taiwan, HK)",
-    "South Asia": "South Asia (India)",
-    "Southeast Asia": "Southeast Asia (Philippines, Vietnam)",
-    "Other Asia": "Other Asia (Pakistan, Iraq, Indonesia, ...)",
+    "South Asia": "South Asia (India only itemized)",
+    "Southeast Asia": "Southeast Asia (Philippines, Vietnam only)",
+    "Other Asia": "Other Asia (non-itemized: Indonesia, Pakistan, Iraq, ...)",
     "Middle East & North Africa": "Middle East & N. Africa",
+    "Sub-Saharan Africa": "Sub-Saharan Africa (Africa excl. Egypt, Morocco)",
 }
 
 SOURCE_NOTE = (
     "Source: DHS/OHSS Yearbook of Immigration Statistics 2016, Table 2 "
     "(persons obtaining LPR status by region of last residence)."
+)
+
+ASIA_NOTE = (
+    "The historical table itemizes only 13 Asian countries; non-itemized origins "
+    "(Indonesia, Pakistan, Thailand, Iraq, ...) fall in \u201cOther Asia.\u201d"
 )
 
 
@@ -180,8 +188,8 @@ def stacked_area_absolute(pivot, regions, out_path):
         labelcolor=TEXT,
     )
     fig.text(
-        0.01, 0.005,
-        SOURCE_NOTE + "  2010\u201316 is a partial decade (7 fiscal years).",
+        0.01, -0.06,
+        SOURCE_NOTE + "  2010\u201316 is a partial decade (7 fiscal years).\n" + ASIA_NOTE,
         ha="left", fontsize=8, color=MUTED, style="italic",
     )
     plt.tight_layout()
@@ -221,7 +229,8 @@ def stacked_area_share(pivot, regions, out_path):
         labelcolor=TEXT,
     )
     fig.text(
-        0.01, 0.005, SOURCE_NOTE, ha="left", fontsize=8, color=MUTED, style="italic"
+        0.01, -0.06, SOURCE_NOTE + "\n" + ASIA_NOTE,
+        ha="left", fontsize=8, color=MUTED, style="italic",
     )
     plt.tight_layout()
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
@@ -253,7 +262,7 @@ def small_multiples(pivot, regions, out_path):
         fontweight="bold",
         fontsize=14,
     )
-    fig.text(0.01, 0.005, SOURCE_NOTE, ha="left", fontsize=8, color=MUTED, style="italic")
+    fig.text(0.01, 0.005, SOURCE_NOTE + "\n" + ASIA_NOTE, ha="left", fontsize=8, color=MUTED, style="italic")
     fig.tight_layout(rect=[0, 0.02, 1, 0.97])
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
