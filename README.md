@@ -8,7 +8,7 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 
 - **~21%** of the U.S. population has *majority* (>50%) pre-1870 White Heritage ancestry; **~56%** has *any* pre-1870 White ancestor.
 - Rebased to the nonblack population (mass basis), **~31%** traces to the pre-1870 White stock — matching the Manhattan Institute's independent cohort-component estimate of ~31% pre-1860 nonblack ([Lehman, 2023](https://manhattan.institute/article/who-pays-for-reparations-the-immigration-challenge-in-the-reparations-debate)). The two methods converge once both use the cited native-vs-immigrant fertility differential.
-- Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −29, FL −13, NY −13**; biggest gainers **IN +16, OH +12, MO +11, TN +9, KY +9**.
+- Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −30, NY −13, FL −13, MA −5, SC −4**; biggest gainers **IN +16, OH +11, MO +10, KY +9, TN +8**.
 
 These figures use the cited per-decade foreign-born:native fertility differential
 (`data/fertility_by_nativity.csv`, default on). Disabling it (`--no-native-fertility`,
@@ -32,16 +32,17 @@ unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASS
 
 ![EC cartogram](outputs/map_hypothetical_ec_2024_tile_mosaic.png)
 
-This is a geographic before→after cartogram. Each state keeps its real shape and
-map position but is drawn twice: a **dashed outline sized by its actual 2024
-electoral votes** and a **solid fill sized by its hypothetical electoral votes**
-under the Heritage-American count. When the fill sits inside the outline the state
-**lost** seats; when the fill spills past the outline it **gained**. Color encodes
-the change (red = gains, blue = losses) and every state is labeled with its
-**actual → hypothetical EV** and the change. California collapses (54 → 24, −30)
-and Florida (30 → 17) and New York (28 → 15) shrink well inside their outlines,
-while Indiana (11 → 27, +16), Ohio (17 → 28, +11), Missouri (10 → 20, +10),
-Kentucky (8 → 17, +9), and Tennessee (11 → 19, +8) burst past theirs.
+This is a **side-by-side electoral-college value cartogram**. Each state is scaled
+about its own centroid so that its **area is proportional to its electoral votes**,
+on a single shared scale that applies to both maps. The **left map** shows the
+**actual 2024 Electoral College** (every U.S. resident counted); the **right map**
+shows the **hypothetical** college under the Heritage-American count, colored by the
+electoral-vote change (red = gains, blue = losses). Because both panels use the same
+area-per-EV scale, a state's size is directly comparable between them: states that
+**shrink** from left to right lost seats and states that **grow** gained them.
+California collapses (54 → 24, −30) and Florida (30 → 17) and New York (28 → 15)
+shrink sharply, while Indiana (11 → 27, +16), Ohio (17 → 28, +11), Missouri
+(10 → 20, +10), Kentucky (8 → 17, +9), and Tennessee (11 → 19, +8) expand.
 
 ### Legal immigration to the United States by region of origin, 1820-2016
 
