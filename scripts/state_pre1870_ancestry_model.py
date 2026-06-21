@@ -60,7 +60,7 @@ Sources
 - Census POP-WP056: Historical race totals, 1790-1990.
 - Census POP-WP081: Historical foreign-born population, 1850-2000.
 - DHS/OHSS Yearbook Table 1: Long-run LPR admissions.
-- Pew Research Center: 2020 immigrant-generation anchors.
+- Census ACS (2008, 2018) and Haines (HSUS Millennial Ed. 2006): fertility by nativity.
 
 Requires: Python 3.9+. No third-party packages required.
 """

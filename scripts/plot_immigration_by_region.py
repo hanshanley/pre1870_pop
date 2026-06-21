@@ -222,14 +222,15 @@ def stacked_area_share(pivot, regions, out_path):
     ax.legend(
         handles[::-1],
         _legend_labels(regions)[::-1],
-        loc="center left",
-        bbox_to_anchor=(1.0, 0.5),
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.12),
+        ncol=4,
         frameon=False,
         fontsize=8.5,
         labelcolor=TEXT,
     )
     fig.text(
-        0.01, -0.06, SOURCE_NOTE + "\n" + ASIA_NOTE,
+        0.01, -0.20, SOURCE_NOTE + "\n" + ASIA_NOTE,
         ha="left", fontsize=8, color=MUTED, style="italic",
     )
     plt.tight_layout()

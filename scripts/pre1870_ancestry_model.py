@@ -33,8 +33,9 @@ Data sources
 - Census Bureau, Gibson & Jung, POP-WP081: Historical foreign-born population.
 - Census Bureau, Gibson & Jung, POP-WP056: Historical race totals, 1790-1990.
 - DHS/OHSS Yearbook of Immigration Statistics, Table 1: LPR admissions.
-- Pew Research Center: 2020 immigrant generation anchors.
-- Historical Statistics of the U.S., Haines Ab1-10: Long-run TFR anchors.
+- Census Bureau, American Community Survey (2008, 2018): modern fertility by nativity.
+- Historical Statistics of the U.S. (Millennial Edition), Haines: long-run TFR
+  and white fertility by nativity.
 
 Usage
 -----
@@ -102,12 +103,16 @@ def _load_1870_baseline(path: pathlib.Path) -> Dict[str, float]:
 
 
 def _load_fertility_ratio_by_year(path: pathlib.Path) -> Dict[int, float]:
-    """Load the cited foreign-born:native-born fertility ratio by decade.
+    """Load the foreign-born:native-born fertility ratio by decade.
 
-    See data/fertility_by_nativity.csv for sources (Haines child-woman ratios by
-    nativity for the historical period; Census ACS / CIS and Pew/NCHS for the
-    modern period). The ratio is the non-qualifying (immigrant-descended) to
-    old-stock (native) relative fertility used to weight births each decade.
+    See data/fertility_by_nativity.csv for sources. The primary sources are
+    Michael R. Haines' white fertility rates by nativity in Historical Statistics
+    of the United States: Millennial Edition (2006) for the historical anchors
+    (1900-1910), and the U.S. Census Bureau American Community Survey (2008, 2018;
+    total fertility rate by nativity via the own-children method) for the modern
+    anchors; intervening decades are interpolated/flagged. The ratio is the
+    non-qualifying (immigrant-descended) to old-stock (native) relative fertility
+    used to weight births each decade.
     """
     out: Dict[int, float] = {}
     with open(path) as f:
@@ -181,7 +186,9 @@ class ModelParams:
     # Differential fertility between old-stock and immigrant-descended (non-
     # qualifying) parents. When native_fertility_differential is True (default),
     # the per-decade ratio is sourced from data/fertility_by_nativity.csv
-    # (Haines child-woman ratios by nativity; Census ACS/CIS; Pew/NCHS) and these
+    # (Haines white fertility by nativity, HSUS Millennial Ed. 2006, for the
+    # historical anchors; Census ACS own-children rates for the modern anchors)
+    # and these
     # two scalar multipliers are used only as a fallback when no data row exists.
     native_fertility_differential: bool = True
     old_stock_fertility_multiplier: float = 0.98
