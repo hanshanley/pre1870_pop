@@ -199,7 +199,7 @@ def stacked_area_absolute(pivot, regions, out_path):
 
 
 def stacked_area_share(pivot, regions, out_path):
-    fig, ax = plt.subplots(figsize=(12.5, 7))
+    fig, ax = plt.subplots(figsize=(20, 8))
     x = _xaxis(ax, pivot)
     abs_series = [pivot[r].values.astype(float) for r in regions]
     colors = [REGION_COLORS[r] for r in regions]
@@ -214,7 +214,7 @@ def stacked_area_share(pivot, regions, out_path):
         "Composition of U.S. immigration by region of origin, 1820\u20132016",
         fontweight="bold",
         pad=14,
-        fontsize=14,
+        fontsize=15,
     )
     ax.margins(x=0)
 
@@ -223,17 +223,17 @@ def stacked_area_share(pivot, regions, out_path):
         handles[::-1],
         _legend_labels(regions)[::-1],
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.12),
-        ncol=4,
+        bbox_to_anchor=(0.5, -0.13),
+        ncol=5,
         frameon=False,
-        fontsize=8.5,
+        fontsize=9,
         labelcolor=TEXT,
-        columnspacing=1.4,
+        columnspacing=1.6,
         handletextpad=0.5,
     )
     fig.text(
-        0.0, -0.42, SOURCE_NOTE + "\n" + ASIA_NOTE,
-        ha="left", va="top", fontsize=8, color=MUTED, style="italic",
+        0.5, -0.30, SOURCE_NOTE + "  2010\u201316 is a partial decade (7 fiscal years).\n" + ASIA_NOTE,
+        ha="center", va="top", fontsize=8.5, color=MUTED, style="italic",
         transform=ax.transAxes,
     )
     plt.tight_layout()

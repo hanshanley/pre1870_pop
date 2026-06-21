@@ -35,8 +35,6 @@ from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 from matplotlib.patches import FancyBboxPatch, Circle, Rectangle
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle as MplRectangle
-import geopandas as gpd
-from shapely.affinity import scale as aff_scale, translate as aff_translate
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -94,21 +92,6 @@ TILE = {
     'NC': (6, 5), 'SC': (7, 5), 'DC': (8, 5),
     'OK': (3, 6), 'LA': (4, 6), 'MS': (5, 6), 'AL': (6, 6), 'GA': (7, 6),
     'HI': (0, 7), 'TX': (3, 7), 'FL': (7, 7),
-}
-
-# Full state name -> postal abbreviation, for joining the GeoJSON to the model output.
-NAME2ABBR = {
-    'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
-    'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'District of Columbia': 'DC',
-    'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL',
-    'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
-    'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN',
-    'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-    'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-    'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR',
-    'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD',
-    'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA',
-    'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
 }
 
 
@@ -261,111 +244,128 @@ def fig_state_map(df_state):
     plt.close(fig)
 
 
+def _grow_tilegram(evmap, anchors):
+    """Allocate, for each state, a contiguous block of unit cells on a square lattice
+    whose size equals the state's electoral votes. Cells are grown outward from a
+    geographic seed (the hand-tuned TILE position), with a compactness bias so each
+    region stays a tight block. Returns {abbr: [(x, y), ...]}. The result is a square
+    tilegram: one box per electoral vote, arranged roughly geographically."""
+    def neighbors(cell):
+        x, y = cell
+        return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+
+    seeds, used = {}, set()
+    for a in evmap:
+        cell = (round(anchors[a][0]), round(anchors[a][1]))
+        while cell in used:
+            cell = (cell[0], cell[1] - 1)
+        seeds[a] = cell
+        used.add(cell)
+
+    claimed, region, remaining, frontier = {}, {a: [] for a in evmap}, {}, {a: [] for a in evmap}
+    for a, cell in seeds.items():
+        if evmap[a] <= 0:
+            remaining[a] = 0
+            continue
+        claimed[cell] = a
+        region[a].append(cell)
+        remaining[a] = evmap[a] - 1
+        frontier[a] = list(neighbors(cell))
+
+    def d2(c, a):
+        sx, sy = seeds[a]
+        return (c[0] - sx) ** 2 + (c[1] - sy) ** 2
+
+    active = [a for a in evmap if remaining[a] > 0]
+    while active:
+        a = min(active, key=lambda s: len(region[s]) / evmap[s])
+        cand = [c for c in frontier[a] if c not in claimed]
+        if not cand:
+            ring = set()
+            for c in region[a]:
+                ring.update(neighbors(c))
+            cand = [c for c in ring if c not in claimed]
+            if not cand:
+                active.remove(a)
+                continue
+        rset = set(region[a])
+        best = min(cand, key=lambda c: d2(c, a) - 2.5 * sum(n in rset for n in neighbors(c)))
+        claimed[best] = a
+        region[a].append(best)
+        frontier[a] = [c for c in frontier[a] if c not in claimed]
+        frontier[a].extend(n for n in neighbors(best) if n not in claimed)
+        remaining[a] -= 1
+        if remaining[a] <= 0:
+            active.remove(a)
+    return region
+
+
 def fig_ec_cartogram(df_state):
-    """Side-by-side electoral-college value cartograms. LEFT: the ACTUAL 2024
-    Electoral College, with every state scaled about its own centroid so its area is
-    proportional to its real electoral votes. RIGHT: a HYPOTHETICAL Electoral College
-    in which only the pre-1870 White "Heritage American"-descended population is
-    counted, with each state scaled to its hypothetical electoral votes and colored by
-    the change vs. 2024. Both panels share one area-per-electoral-vote scale and the
-    same axis limits, so a state's size is directly comparable between the two maps:
-    states that shrink from left to right (e.g. CA, NY, FL) lose seats, states that
-    grow (e.g. IN, OH, MO) gain them."""
+    """Side-by-side electoral-college tilegrams ("boxes" cartograms). Each state is
+    drawn as a contiguous block of unit squares, one square per electoral vote, laid
+    out roughly geographically. LEFT: the ACTUAL 2024 Electoral College (every U.S.
+    resident counted). RIGHT: a HYPOTHETICAL Electoral College in which only the
+    pre-1870 White "Heritage American"-descended population is counted, colored by the
+    electoral-vote change vs. 2024. Because one box always equals one electoral vote,
+    a state's block visibly shrinks (CA, NY, FL) or grows (IN, OH, MO, KY, TN) between
+    the two maps in exact proportion to the seats it loses or gains."""
     ev_cmap = LinearSegmentedColormap.from_list(
         "ev_change", [SUBSTACK_BLUE, "#9DBFCC", "#EDE7DC", "#D4956A", SUBSTACK_ACCENT], N=256)
     ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
     NEUTRAL = "#8FAAB8"
 
-    evd = {r["abbr"]: r for _, r in df_state.iterrows()}
-    base = gpd.read_file(DATA / "us_states.geojson").to_crs(5070)
-    base["abbr"] = base["name"].map(NAME2ABBR)
-    base = base[base["abbr"].notna() & base["abbr"].isin(evd)].copy()
-    base["actual"] = base["abbr"].map(lambda a: int(round(evd[a]["actual_ev_2024"])))
-    base["hyp"] = base["abbr"].map(lambda a: int(round(evd[a]["hypothetical_ev"])))
-    base["change"] = base["abbr"].map(lambda a: int(evd[a]["ev_change"]))
-    base["area"] = base.geometry.area
+    EVA = {r["abbr"]: int(round(r["actual_ev_2024"])) for _, r in df_state.iterrows()}
+    EVH = {r["abbr"]: int(round(r["hypothetical_ev"])) for _, r in df_state.iterrows()}
+    CHG = {r["abbr"]: int(r["ev_change"]) for _, r in df_state.iterrows()}
 
-    # One area-per-EV scale, shared by both panels. Actual and hypothetical electoral
-    # votes both sum to 538 (535 excluding DC), so the same scale makes the two maps
-    # directly comparable. DC is drawn separately as a fixed offset marker.
-    main = base[base["abbr"] != "DC"]
-    per_ev = main["area"].sum() / main["actual"].sum()
+    # Geographic seed positions from the hand-tuned TILE grid (one cell per state),
+    # scaled so big states have room to grow; AK/HI dropped into a lower-left inset.
+    sp = 3.0
+    anchors = {a: (c * sp, -r * sp) for a, (c, r) in TILE.items() if a in EVA}
+    anchors["AK"] = (-1.0 * sp, -8.0 * sp)
+    anchors["HI"] = (1.5 * sp, -8.0 * sp)
 
-    def build(ev_attr):
-        gg = base.copy()
-        geoms = []
-        for r in gg.itertuples():
-            s = np.sqrt((getattr(r, ev_attr) * per_ev) / r.area)
-            geoms.append(aff_scale(r.geometry, xfact=s, yfact=s, origin=r.geometry.centroid))
-        gg = gg.set_geometry(gpd.GeoSeries(geoms, index=gg.index, crs=gg.crs))
-        conus = gg[~gg["abbr"].isin(["AK", "HI", "DC"])]
-        minx, miny, maxx, maxy = conus.total_bounds
-        gname = gg.geometry.name
+    regA = _grow_tilegram(EVA, anchors)
+    regH = _grow_tilegram(EVH, anchors)
 
-        def reposition(abbr, fx, fy, shrink=1.0):
-            geom = gg.loc[gg["abbr"] == abbr, gname].iloc[0]
-            if shrink != 1.0:
-                geom = aff_scale(geom, shrink, shrink, origin=geom.centroid)
-            c = geom.centroid
-            tx, ty = minx + fx * (maxx - minx), miny + fy * (maxy - miny)
-            gg.loc[gg["abbr"] == abbr, gname] = aff_translate(geom, tx - c.x, ty - c.y)
-
-        reposition("AK", 0.05, 0.10, shrink=0.45)
-        reposition("HI", 0.15, 0.02)
-        return gg
-
-    gA = build("actual")
-    gH = build("hyp")
-    gname = gA.geometry.name
-
-    minx, miny, maxx, maxy = pd.concat([gA, gH]).total_bounds
-    padx, pady = (maxx - minx) * 0.03, (maxy - miny) * 0.05
+    allcells = [c for cells in regA.values() for c in cells] + \
+               [c for cells in regH.values() for c in cells]
+    xs = [c[0] for c in allcells]
+    ys = [c[1] for c in allcells]
+    xlim = (min(xs) - 1.0, max(xs) + 1.0)
+    ylim = (min(ys) - 1.0, max(ys) + 1.0)
 
     fig, axes = plt.subplots(1, 2, figsize=(20, 9.5))
 
-    def draw(ax, gg, ev_attr, color_mode, title):
+    def draw(ax, region, evmap, color_mode, title):
         ax.set_axis_off()
         ax.set_aspect("equal")
-        ax.set_xlim(minx - padx, maxx + padx)
-        ax.set_ylim(miny - pady, maxy + pady)
-        for r in gg.itertuples():
-            if r.abbr == "DC":
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        for a, cells in region.items():
+            fc = NEUTRAL if color_mode == "neutral" else ev_cmap(ev_norm(CHG[a]))
+            for (x, y) in cells:
+                ax.add_patch(MplRectangle((x - 0.5, y - 0.5), 0.94, 0.94,
+                                          facecolor=fc, edgecolor="white", linewidth=0.7,
+                                          zorder=3))
+        for a, cells in region.items():
+            if not cells:
                 continue
-            fc = NEUTRAL if color_mode == "neutral" else ev_cmap(ev_norm(r.change))
-            gpd.GeoSeries([getattr(r, gname)]).plot(
-                ax=ax, facecolor=fc, edgecolor="white", linewidth=0.8, zorder=3, alpha=0.95)
-        for r in gg.itertuples():
-            if r.abbr == "DC":
-                continue
-            ev = getattr(r, ev_attr)
-            c = getattr(r, gname).centroid
-            dark = color_mode == "change" and (r.change <= -14 or r.change >= 9)
+            cx = sum(c[0] for c in cells) / len(cells)
+            cy = sum(c[1] for c in cells) / len(cells)
+            ev = evmap[a]
+            dark = color_mode == "change" and (CHG[a] <= -14 or CHG[a] >= 9)
             txt = "white" if dark else SUBSTACK_TEXT
             halo = SUBSTACK_TEXT if dark else "white"
-            small = ev <= 4
-            fs = 6.0 if small else (9.5 if ev >= 10 else 7.4)
-            lab = f"{r.abbr} {ev}" if small else f"{r.abbr}\n{ev}"
-            ax.text(c.x, c.y, lab, ha="center", va="center", linespacing=0.95,
+            fs = 6.0 if ev <= 3 else (9.0 if ev >= 12 else 7.4)
+            ax.text(cx, cy, f"{a}\n{ev}", ha="center", va="center", linespacing=0.9,
                     fontsize=fs, fontweight="bold", color=txt, zorder=5,
-                    path_effects=[pe.withStroke(linewidth=1.8, foreground=halo)])
-        # DC: fixed offset square (3 EV in both scenarios) with a leader line.
-        dc = gg[gg["abbr"] == "DC"].iloc[0]
-        dcc = dc.geometry.centroid
-        sz = np.sqrt(3 * per_ev)
-        fc = NEUTRAL if color_mode == "neutral" else ev_cmap(ev_norm(int(dc["change"])))
-        ax.add_patch(MplRectangle(
-            (dcc.x - sz / 2, dcc.y - sz / 2), sz, sz,
-            facecolor=fc, edgecolor="white", linewidth=0.8, zorder=4))
-        ax.annotate(f"DC {int(getattr(dc, ev_attr))}", xy=(dcc.x, dcc.y),
-                    xytext=(dcc.x + 300000, dcc.y - 150000),
-                    fontsize=6.5, fontweight="bold", color=SUBSTACK_TEXT, zorder=6,
-                    arrowprops=dict(arrowstyle="-", color=SUBSTACK_MUTED, lw=0.6),
-                    path_effects=[pe.withStroke(linewidth=2, foreground="white")])
+                    path_effects=[pe.withStroke(linewidth=1.7, foreground=halo)])
         ax.set_title(title, fontsize=14.5, fontweight="bold", pad=6)
 
-    draw(axes[0], gA, "actual", "neutral",
+    draw(axes[0], regA, EVA, "neutral",
          "Actual 2024 Electoral College\n(every U.S. resident counted)")
-    draw(axes[1], gH, "hyp", "change",
+    draw(axes[1], regH, EVH, "change",
          'If only pre-1870 White "Heritage Americans" counted\n(hypothetical electoral votes)')
 
     sm = plt.cm.ScalarMappable(cmap=ev_cmap, norm=ev_norm)
@@ -385,10 +385,10 @@ def fig_ec_cartogram(df_state):
     fig.text(0.5, 0.075, f"Biggest gainers: {top_gain}     |     Biggest losers: {top_lose}",
              ha="center", fontsize=10.5, color=SUBSTACK_TEXT, fontweight="bold")
     fig.text(0.5, 0.022,
-             "Each state's area is proportional to its electoral votes on a single shared scale; the two maps "
-             "are directly comparable.\nMajority pre-1870 White \"Heritage American\" count, Huntington-Hill "
-             "apportionment, 435 House seats, DC fixed at 3 EV. Source: state agent-based model with NHGIS "
-             "historical Census data.",
+             "Each box = one electoral vote; a state's block shrinks or grows in exact proportion to the "
+             "seats it loses or gains between the two maps.\nMajority pre-1870 White \"Heritage American\" "
+             "count, Huntington-Hill apportionment, 435 House seats, DC fixed at 3 EV. Source: state "
+             "agent-based model with NHGIS historical Census data.",
              ha="center", fontsize=8.5, color=SUBSTACK_MUTED, style="italic", linespacing=1.4)
     plt.subplots_adjust(left=0.02, right=0.98, top=0.85, bottom=0.2, wspace=0.04)
     plt.savefig(OUT / "map_hypothetical_ec_2024_tile_mosaic.png", dpi=200, bbox_inches="tight")

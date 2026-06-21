@@ -32,17 +32,17 @@ unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASS
 
 ![EC cartogram](outputs/map_hypothetical_ec_2024_tile_mosaic.png)
 
-This is a **side-by-side electoral-college value cartogram**. Each state is scaled
-about its own centroid so that its **area is proportional to its electoral votes**,
-on a single shared scale that applies to both maps. The **left map** shows the
-**actual 2024 Electoral College** (every U.S. resident counted); the **right map**
-shows the **hypothetical** college under the Heritage-American count, colored by the
-electoral-vote change (red = gains, blue = losses). Because both panels use the same
-area-per-EV scale, a state's size is directly comparable between them: states that
-**shrink** from left to right lost seats and states that **grow** gained them.
-California collapses (54 → 24, −30) and Florida (30 → 17) and New York (28 → 15)
-shrink sharply, while Indiana (11 → 27, +16), Ohio (17 → 28, +11), Missouri
-(10 → 20, +10), Kentucky (8 → 17, +9), and Tennessee (11 → 19, +8) expand.
+This is a **side-by-side electoral-college tilegram** ("boxes" cartogram). Each
+state is drawn as a contiguous block of unit squares — **one box per electoral
+vote** — laid out roughly geographically. The **left map** is the **actual 2024
+Electoral College** (every U.S. resident counted); the **right map** is the
+**hypothetical** college under the Heritage-American count, colored by the
+electoral-vote change (red = gains, blue = losses). Because one box always equals one
+electoral vote, a state's block **shrinks** or **grows** between the two maps in exact
+proportion to the seats it loses or gains. California collapses (54 → 24, −30) and
+Florida (30 → 17) and New York (28 → 15) shrink sharply, while Indiana (11 → 27, +16),
+Ohio (17 → 28, +11), Missouri (10 → 20, +10), Kentucky (8 → 17, +9), and Tennessee
+(11 → 19, +8) expand.
 
 ### Legal immigration to the United States by region of origin, 1820-2016
 
