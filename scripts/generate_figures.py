@@ -32,8 +32,8 @@ import matplotlib.patheffects as pe
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
-from matplotlib.patches import FancyBboxPatch, Circle, Rectangle
-from matplotlib.collections import PatchCollection
+from matplotlib.patches import FancyBboxPatch, Circle, Rectangle, Patch
+from matplotlib.collections import PatchCollection, LineCollection
 from matplotlib.patches import Rectangle as MplRectangle
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -302,21 +302,27 @@ def _grow_tilegram(evmap, anchors):
 
 def fig_ec_cartogram(df_state):
     """Side-by-side electoral-college tilegrams ("boxes" cartograms). Each state is
-    drawn as a contiguous block of unit squares, one square per electoral vote, laid
-    out roughly geographically. LEFT: the ACTUAL 2024 Electoral College (every U.S.
-    resident counted). RIGHT: a HYPOTHETICAL Electoral College in which only the
-    pre-1870 White "Heritage American"-descended population is counted, colored by the
-    electoral-vote change vs. 2024. Because one box always equals one electoral vote,
-    a state's block visibly shrinks (CA, NY, FL) or grows (IN, OH, MO, KY, TN) between
-    the two maps in exact proportion to the seats it loses or gains."""
-    ev_cmap = LinearSegmentedColormap.from_list(
-        "ev_change", [SUBSTACK_BLUE, "#9DBFCC", "#EDE7DC", "#D4956A", SUBSTACK_ACCENT], N=256)
-    ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
-    NEUTRAL = "#8FAAB8"
+    drawn as a contiguous block of unit squares, one square per electoral vote, with a
+    bold outline around each state so individual states stay legible, laid out roughly
+    geographically so the whole still reads like a U.S. map. States are colored by
+    partisan lean (Republican-leaning red, Democratic-leaning blue, swing/battleground
+    neutral). LEFT: the ACTUAL 2024 Electoral College (every U.S. resident counted).
+    RIGHT: a HYPOTHETICAL Electoral College in which only the pre-1870 White "Heritage
+    American"-descended population is counted. Because one box always equals one
+    electoral vote, a state's block visibly shrinks (CA, NY, FL) or grows (IN, OH, MO,
+    KY, TN) between the two maps in exact proportion to the seats it loses or gains, and
+    the map as a whole shifts visibly toward the Republican-leaning interior."""
+    # Partisan lean: swing/battleground states are neutral; the rest split R / D.
+    SWING = {"AZ", "GA", "MI", "NV", "NC", "PA", "WI", "NH"}
+    DEM = {"CA", "CO", "CT", "DE", "DC", "HI", "IL", "ME", "MD", "MA", "MN",
+           "NJ", "NM", "NY", "OR", "RI", "VT", "VA", "WA"}
+    LEAN_COLORS = {"R": "#B5402F", "D": "#2C5E7E", "S": "#CFC6B6"}
+
+    def lean(a):
+        return "S" if a in SWING else "D" if a in DEM else "R"
 
     EVA = {r["abbr"]: int(round(r["actual_ev_2024"])) for _, r in df_state.iterrows()}
     EVH = {r["abbr"]: int(round(r["hypothetical_ev"])) for _, r in df_state.iterrows()}
-    CHG = {r["abbr"]: int(r["ev_change"]) for _, r in df_state.iterrows()}
 
     # Geographic seed positions from the hand-tuned TILE grid (one cell per state),
     # scaled so big states have room to grow; AK/HI dropped into a lower-left inset.
@@ -335,46 +341,64 @@ def fig_ec_cartogram(df_state):
     xlim = (min(xs) - 1.0, max(xs) + 1.0)
     ylim = (min(ys) - 1.0, max(ys) + 1.0)
 
+    def state_borders(region):
+        owner = {c: a for a, cells in region.items() for c in cells}
+        segs = []
+        for a, cells in region.items():
+            for (x, y) in cells:
+                if owner.get((x + 1, y)) != a:
+                    segs.append([(x + 0.5, y - 0.5), (x + 0.5, y + 0.5)])
+                if owner.get((x - 1, y)) != a:
+                    segs.append([(x - 0.5, y - 0.5), (x - 0.5, y + 0.5)])
+                if owner.get((x, y + 1)) != a:
+                    segs.append([(x - 0.5, y + 0.5), (x + 0.5, y + 0.5)])
+                if owner.get((x, y - 1)) != a:
+                    segs.append([(x - 0.5, y - 0.5), (x + 0.5, y - 0.5)])
+        return segs
+
     fig, axes = plt.subplots(1, 2, figsize=(20, 9.5))
 
-    def draw(ax, region, evmap, color_mode, title):
+    def draw(ax, region, evmap, title):
         ax.set_axis_off()
         ax.set_aspect("equal")
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
+        # Fully-filled unit cells with a faint internal grid (the "boxes")...
         for a, cells in region.items():
-            fc = NEUTRAL if color_mode == "neutral" else ev_cmap(ev_norm(CHG[a]))
+            fc = LEAN_COLORS[lean(a)]
             for (x, y) in cells:
-                ax.add_patch(MplRectangle((x - 0.5, y - 0.5), 0.94, 0.94,
-                                          facecolor=fc, edgecolor="white", linewidth=0.7,
-                                          zorder=3))
+                ax.add_patch(MplRectangle((x - 0.5, y - 0.5), 1.0, 1.0, facecolor=fc,
+                                          edgecolor="#FFFFFF", linewidth=0.4, zorder=3))
+        # ...then a bold outline around each state so states stay distinct.
+        ax.add_collection(LineCollection(state_borders(region), colors="#2B2B2B",
+                                         linewidths=1.6, zorder=4))
         for a, cells in region.items():
             if not cells:
                 continue
             cx = sum(c[0] for c in cells) / len(cells)
             cy = sum(c[1] for c in cells) / len(cells)
             ev = evmap[a]
-            dark = color_mode == "change" and (CHG[a] <= -14 or CHG[a] >= 9)
-            txt = "white" if dark else SUBSTACK_TEXT
-            halo = SUBSTACK_TEXT if dark else "white"
+            light = lean(a) in ("R", "D")
+            txt = "white" if light else SUBSTACK_TEXT
+            halo = "#1A1A1A" if light else "white"
             fs = 6.0 if ev <= 3 else (9.0 if ev >= 12 else 7.4)
             ax.text(cx, cy, f"{a}\n{ev}", ha="center", va="center", linespacing=0.9,
                     fontsize=fs, fontweight="bold", color=txt, zorder=5,
                     path_effects=[pe.withStroke(linewidth=1.7, foreground=halo)])
         ax.set_title(title, fontsize=14.5, fontweight="bold", pad=6)
 
-    draw(axes[0], regA, EVA, "neutral",
+    draw(axes[0], regA, EVA,
          "Actual 2024 Electoral College\n(every U.S. resident counted)")
-    draw(axes[1], regH, EVH, "change",
+    draw(axes[1], regH, EVH,
          'If only pre-1870 White "Heritage Americans" counted\n(hypothetical electoral votes)')
 
-    sm = plt.cm.ScalarMappable(cmap=ev_cmap, norm=ev_norm)
-    sm._A = []
-    cax = fig.add_axes([0.36, 0.135, 0.28, 0.018])
-    cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
-    cbar.set_label("Electoral-vote change vs. actual 2024 (right panel)", fontsize=10)
-    cbar.ax.tick_params(labelsize=9)
-    cbar.outline.set_edgecolor(SUBSTACK_GRID)
+    legend_handles = [
+        Patch(facecolor=LEAN_COLORS["R"], edgecolor="#2B2B2B", label="Republican-leaning"),
+        Patch(facecolor=LEAN_COLORS["S"], edgecolor="#2B2B2B", label="Swing / battleground"),
+        Patch(facecolor=LEAN_COLORS["D"], edgecolor="#2B2B2B", label="Democratic-leaning"),
+    ]
+    fig.legend(handles=legend_handles, loc="lower center", ncol=3, frameon=False,
+               fontsize=11, bbox_to_anchor=(0.5, 0.115))
 
     fig.suptitle('U.S. Electoral College: Actual 2024 vs. a Pre-1870 White "Heritage American" Count',
                  fontsize=17, fontweight="bold", y=0.995)
@@ -386,9 +410,9 @@ def fig_ec_cartogram(df_state):
              ha="center", fontsize=10.5, color=SUBSTACK_TEXT, fontweight="bold")
     fig.text(0.5, 0.022,
              "Each box = one electoral vote; a state's block shrinks or grows in exact proportion to the "
-             "seats it loses or gains between the two maps.\nMajority pre-1870 White \"Heritage American\" "
-             "count, Huntington-Hill apportionment, 435 House seats, DC fixed at 3 EV. Source: state "
-             "agent-based model with NHGIS historical Census data.",
+             "seats it loses or gains between the two maps. Color = partisan lean.\nMajority pre-1870 White "
+             "\"Heritage American\" count, Huntington-Hill apportionment, 435 House seats, DC fixed at 3 EV. "
+             "Source: state agent-based model with NHGIS historical Census data.",
              ha="center", fontsize=8.5, color=SUBSTACK_MUTED, style="italic", linespacing=1.4)
     plt.subplots_adjust(left=0.02, right=0.98, top=0.85, bottom=0.2, wspace=0.04)
     plt.savefig(OUT / "map_hypothetical_ec_2024_tile_mosaic.png", dpi=200, bbox_inches="tight")
