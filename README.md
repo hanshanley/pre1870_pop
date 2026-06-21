@@ -32,14 +32,16 @@ unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASS
 
 ![EC cartogram](outputs/map_hypothetical_ec_2024_tile_mosaic.png)
 
-This is a geographic cartogram: every state keeps its real shape and position on
-the U.S. map but is resized so its **area is proportional to its electoral votes**
-under the hypothetical count, over a faint outline of its true geography. Color
-encodes the change vs. actual 2024 (red = gains, blue = losses) and larger states
-are labeled with their **actual 2024 EV → hypothetical EV**. California visibly
-collapses (54 → 24, −30) and Florida (30 → 17) and New York (28 → 15) shrink, while
-Indiana (11 → 27, +16), Ohio (17 → 28, +11), Missouri (10 → 20, +10), Kentucky
-(8 → 17, +9), and Tennessee (11 → 19, +8) swell.
+This is a geographic before→after cartogram. Each state keeps its real shape and
+map position but is drawn twice: a **dashed outline sized by its actual 2024
+electoral votes** and a **solid fill sized by its hypothetical electoral votes**
+under the Heritage-American count. When the fill sits inside the outline the state
+**lost** seats; when the fill spills past the outline it **gained**. Color encodes
+the change (red = gains, blue = losses) and every state is labeled with its
+**actual → hypothetical EV** and the change. California collapses (54 → 24, −30)
+and Florida (30 → 17) and New York (28 → 15) shrink well inside their outlines,
+while Indiana (11 → 27, +16), Ohio (17 → 28, +11), Missouri (10 → 20, +10),
+Kentucky (8 → 17, +9), and Tennessee (11 → 19, +8) burst past theirs.
 
 ### Legal immigration to the United States by region of origin, 1820-2016
 

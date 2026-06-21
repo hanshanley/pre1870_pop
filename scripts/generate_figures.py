@@ -262,12 +262,14 @@ def fig_state_map(df_state):
 
 
 def fig_ec_cartogram(df_state):
-    """Geographic value cartogram: each state is drawn in its real shape on a U.S.
-    map, then rescaled about its centroid so that its AREA is proportional to its
-    hypothetical electoral votes. Faint true-geography outlines are kept underneath
-    for context, so states visibly shrink (e.g. CA, FL, NY) or grow (e.g. IN, OH,
-    MO) relative to the map. Color encodes the electoral-vote change vs. actual 2024;
-    larger states are labeled with their actual -> hypothetical electoral votes."""
+    """Geographic before->after value cartogram. Each state keeps its real shape and
+    map position, but is drawn twice about its own centroid: a dashed outline scaled
+    so its AREA is proportional to its ACTUAL 2024 electoral votes, and a solid fill
+    scaled to its HYPOTHETICAL electoral votes under a majority pre-1870 White
+    "Heritage American" count. The fill therefore sits inside the outline when a state
+    loses seats (e.g. CA, FL, NY) and spills past it when a state gains (e.g. IN, OH,
+    MO). Color encodes the electoral-vote change; every state is labeled with its
+    actual -> hypothetical EV and the change."""
     ev_cmap = LinearSegmentedColormap.from_list(
         "ev_change", [SUBSTACK_BLUE, "#9DBFCC", "#EDE7DC", "#D4956A", SUBSTACK_ACCENT], N=256)
     ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
@@ -282,26 +284,30 @@ def fig_ec_cartogram(df_state):
     g["area"] = g.geometry.area
 
     # Area-conserving non-contiguous cartogram (DC excluded; drawn as a fixed marker).
+    # Actual and hypothetical electoral votes both sum to 538, so the same area-per-EV
+    # scale applies to both layers and their sizes are directly comparable.
     main = g[g["abbr"] != "DC"]
     per_ev = main["area"].sum() / main["ev"].sum()
 
-    def make_cart(geom, ev, area, cap=2.3):
-        s = min(np.sqrt((ev * per_ev) / area), cap)
+    def scaled(geom, ev, area):
+        s = np.sqrt((ev * per_ev) / area)
         return aff_scale(geom, xfact=s, yfact=s, origin=geom.centroid)
 
-    g["cart"] = [make_cart(r.geometry, r.ev, r.area) for r in g.itertuples()]
+    g["fill"] = [scaled(r.geometry, r.ev, r.area) for r in g.itertuples()]
+    g["outline"] = [scaled(r.geometry, r.actual, r.area) for r in g.itertuples()]
 
     # Move the Alaska and Hawaii cartograms into a lower-left inset (Albers-USA style).
     conus = g[~g["abbr"].isin(["AK", "HI", "DC"])]
     minx, miny, maxx, maxy = conus.total_bounds
 
     def reposition(abbr, fx, fy, shrink=1.0):
-        geom = g.loc[g["abbr"] == abbr, "cart"].iloc[0]
-        if shrink != 1.0:
-            geom = aff_scale(geom, shrink, shrink, origin=geom.centroid)
-        c = geom.centroid
-        tx, ty = minx + fx * (maxx - minx), miny + fy * (maxy - miny)
-        g.loc[g["abbr"] == abbr, "cart"] = aff_translate(geom, tx - c.x, ty - c.y)
+        for col in ("fill", "outline"):
+            geom = g.loc[g["abbr"] == abbr, col].iloc[0]
+            if shrink != 1.0:
+                geom = aff_scale(geom, shrink, shrink, origin=geom.centroid)
+            c = geom.centroid
+            tx, ty = minx + fx * (maxx - minx), miny + fy * (maxy - miny)
+            g.loc[g["abbr"] == abbr, col] = aff_translate(geom, tx - c.x, ty - c.y)
 
     reposition("AK", 0.06, 0.10, shrink=0.45)
     reposition("HI", 0.16, 0.03)
@@ -310,24 +316,40 @@ def fig_ec_cartogram(df_state):
     ax.set_axis_off()
     ax.set_aspect("equal")
 
-    gpd.GeoSeries(conus.geometry.values).plot(
-        ax=ax, facecolor="none", edgecolor="#CFCABB", linewidth=0.7, zorder=1)
-
-    for r in gpd.GeoDataFrame(g, geometry="cart").itertuples():
+    # Dashed outline = state sized by its ACTUAL 2024 electoral votes.
+    for r in gpd.GeoDataFrame(g, geometry="outline").itertuples():
         if r.abbr == "DC":
             continue
-        gpd.GeoSeries([r.cart]).plot(
+        gpd.GeoSeries([r.outline]).plot(
+            ax=ax, facecolor="none", edgecolor="#B0A99B", linewidth=1.0,
+            linestyle=(0, (4, 2)), zorder=2)
+
+    # Solid fill = state sized by its HYPOTHETICAL electoral votes.
+    for r in gpd.GeoDataFrame(g, geometry="fill").itertuples():
+        if r.abbr == "DC":
+            continue
+        gpd.GeoSeries([r.fill]).plot(
             ax=ax, facecolor=ev_cmap(ev_norm(r.change)), edgecolor="white",
-            linewidth=1.0, zorder=3)
-        c = r.cart.centroid
-        big = r.ev >= 7
+            linewidth=0.9, zorder=3, alpha=0.92)
+
+    # Label every state with actual -> hypothetical EV and the change.
+    for r in g.itertuples():
+        if r.abbr == "DC":
+            continue
+        c = r.fill.centroid
         dark = r.change <= -14 or r.change >= 9
         txt = "white" if dark else SUBSTACK_TEXT
         halo = SUBSTACK_TEXT if dark else "white"
-        lab = f"{r.abbr}\n{r.actual}\u2192{r.ev}" if big else r.abbr
+        small = r.ev <= 4
+        fs = 5.8 if small else (8.5 if r.ev >= 10 else 7.0)
+        if small:
+            lab = f"{r.abbr} {r.change:+d}"
+        else:
+            chg = f"({'+' if r.change > 0 else ''}{r.change})" if r.change != 0 else "(0)"
+            lab = f"{r.abbr}\n{r.actual}\u2192{r.ev} {chg}"
         ax.text(c.x, c.y, lab, ha="center", va="center", linespacing=0.95,
-                fontsize=8.5 if big else 6.8, fontweight="bold", color=txt, zorder=5,
-                path_effects=[pe.withStroke(linewidth=2.0, foreground=halo)])
+                fontsize=fs, fontweight="bold", color=txt, zorder=5,
+                path_effects=[pe.withStroke(linewidth=1.8, foreground=halo)])
 
     dc = g[g["abbr"] == "DC"].iloc[0]
     dcc = dc.geometry.centroid
@@ -335,7 +357,7 @@ def fig_ec_cartogram(df_state):
     ax.add_patch(MplRectangle(
         (dcc.x - sz / 2, dcc.y - sz / 2), sz, sz,
         facecolor=ev_cmap(ev_norm(int(dc["change"]))), edgecolor="white",
-        linewidth=1.0, zorder=4))
+        linewidth=0.9, zorder=4))
     ax.annotate("DC", xy=(dcc.x, dcc.y), xytext=(dcc.x + 280000, dcc.y - 130000),
                 fontsize=7, fontweight="bold", color=SUBSTACK_TEXT, zorder=6,
                 arrowprops=dict(arrowstyle="-", color=SUBSTACK_MUTED, lw=0.6),
@@ -348,22 +370,24 @@ def fig_ec_cartogram(df_state):
     cbar.ax.tick_params(labelsize=10)
     cbar.outline.set_edgecolor(SUBSTACK_GRID)
 
-    ax.set_title('Hypothetical 2024 Electoral College Cartogram\n'
-                 'State size \u221d electoral votes under a majority pre-1870 White "Heritage American" count',
-                 fontsize=17, fontweight="bold", pad=12)
+    ax.set_title('Hypothetical 2024 Electoral College Cartogram',
+                 fontsize=18, fontweight="bold", pad=12)
+    fig.text(0.5, 0.075,
+             "Dashed outline = state sized by its ACTUAL 2024 electoral votes;  solid fill = sized by "
+             "HYPOTHETICAL votes.\nFill inside the outline = the state lost seats; fill spilling past "
+             "it = the state gained.",
+             ha="center", fontsize=9.5, color=SUBSTACK_TEXT, linespacing=1.5)
     gainers = df_state[df_state["ev_change"] > 0].sort_values("ev_change", ascending=False)
     losers = df_state[df_state["ev_change"] < 0].sort_values("ev_change")
     top_gain = ", ".join(f"{r['abbr']} ({int(r['ev_change']):+d})" for _, r in gainers.head(5).iterrows())
     top_lose = ", ".join(f"{r['abbr']} ({int(r['ev_change']):+d})" for _, r in losers.head(5).iterrows())
-    fig.text(0.5, 0.055, f"Biggest gainers: {top_gain}\nBiggest losers: {top_lose}",
-             ha="center", fontsize=10, color=SUBSTACK_TEXT, linespacing=1.6, fontweight="bold")
-    fig.text(0.5, 0.012,
-             "Each state is resized so its area is proportional to its hypothetical electoral votes "
-             "(faint outline = true geography); labels show actual\u2192hypothetical EV.\n"
-             "Huntington-Hill apportionment, 435 House seats, DC fixed at 3 EV. "
-             "Source: state agent-based model with NHGIS historical Census data",
+    fig.text(0.5, 0.035, f"Biggest gainers: {top_gain}    |    Biggest losers: {top_lose}",
+             ha="center", fontsize=10, color=SUBSTACK_TEXT, fontweight="bold")
+    fig.text(0.5, 0.008,
+             "Majority pre-1870 White \"Heritage American\" count. Huntington-Hill apportionment, "
+             "435 House seats, DC fixed at 3 EV. Source: state agent-based model with NHGIS historical Census data",
              ha="center", fontsize=8, color=SUBSTACK_MUTED, style="italic")
-    plt.subplots_adjust(bottom=0.1)
+    plt.subplots_adjust(bottom=0.12)
     plt.savefig(OUT / "map_hypothetical_ec_2024_tile_mosaic.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 
