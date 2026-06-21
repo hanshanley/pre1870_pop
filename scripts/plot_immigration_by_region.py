@@ -228,10 +228,13 @@ def stacked_area_share(pivot, regions, out_path):
         frameon=False,
         fontsize=8.5,
         labelcolor=TEXT,
+        columnspacing=1.4,
+        handletextpad=0.5,
     )
     fig.text(
-        0.01, -0.20, SOURCE_NOTE + "\n" + ASIA_NOTE,
-        ha="left", fontsize=8, color=MUTED, style="italic",
+        0.0, -0.42, SOURCE_NOTE + "\n" + ASIA_NOTE,
+        ha="left", va="top", fontsize=8, color=MUTED, style="italic",
+        transform=ax.transAxes,
     )
     plt.tight_layout()
     fig.savefig(out_path, dpi=200, bbox_inches="tight")

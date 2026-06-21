@@ -32,12 +32,15 @@ unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASS
 
 ![EC cartogram](outputs/map_hypothetical_ec_2024_tile_mosaic.png)
 
-Each tile is one state, evenly placed in a recognizable U.S. layout. Every tile
-is labeled with its **actual 2024 EV → hypothetical EV** and the absolute change,
-so the starting point is visible alongside the shift. Color encodes the change
-(red = gains, blue = losses). The biggest swing is California (54 → 24, −30); the
-largest gainers are Indiana (+16), Ohio (+11), Missouri (+10), Kentucky (+9), and
-Tennessee (+8).
+Two panels compare the **actual 2024** Electoral College (left) with the
+**hypothetical** allocation (right) under a majority pre-1870 White "Heritage
+American" count. Each state is a block whose **area is proportional to its
+electoral votes**, stacked into geographic columns (west→east) so the blocks
+tessellate with no gaps. Both panels share one vertical scale, so a state visibly
+shrinks or grows between them; color encodes the change (red = gains, blue =
+losses). The biggest swing is California (54 → 24, −30); the largest gainers are
+Indiana (11 → 27, +16), Ohio (17 → 28, +11), Missouri (10 → 20, +10), Kentucky
+(8 → 17, +9), and Tennessee (11 → 19, +8).
 
 ### Legal immigration to the United States by region of origin, 1820-2016
 
