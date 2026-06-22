@@ -341,9 +341,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-html",
-        default="hypothetical_ec_reapportionment_primary_map.html",
+        default=None,
         type=Path,
-        help="Output HTML map path.",
+        help=(
+            "Output HTML map path. If omitted, it is derived from --output-csv "
+            "(same directory and stem, with a '_map.html' suffix) so each metric "
+            "writes its own map instead of overwriting a shared default."
+        ),
     )
     parser.add_argument(
         "--no-map",
@@ -357,6 +361,12 @@ def main() -> None:
         help="How to treat DC. 'fixed': keep at 3 EV. 'exclude': omit from output.",
     )
     args = parser.parse_args()
+
+    # Derive the HTML map path from the CSV path when not explicitly provided so
+    # that, e.g., outputs/..._average.csv -> outputs/..._average_map.html rather
+    # than every metric overwriting a single hard-coded default.
+    if args.output_html is None:
+        args.output_html = args.output_csv.with_name(args.output_csv.stem + "_map.html")
 
     metric_col = normalize_metric(args.metric)
     df = build_reapportionment_table(args.input, metric_col, dc_mode=args.dc_mode)

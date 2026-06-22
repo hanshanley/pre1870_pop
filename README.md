@@ -253,4 +253,4 @@ This project uses NHGIS data. If you use these results, cite:
 - `pandas` — data manipulation and reapportionment
 - `requests` — Census and NHGIS API calls
 - `matplotlib` — visualizations
-- `plotly` — optional, interactive HTML map
+- `plotly` — interactive HTML EC map (written by default; pass `--no-map` to skip)
