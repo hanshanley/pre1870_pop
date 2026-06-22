@@ -184,26 +184,36 @@ class ModelParams:
     restrict_to_white_1870: bool = True
     count_1870_foreign_born_as_qualifying: bool = True
     # Scales gross LPR admissions to approximate total immigrant entries.
-    # >1.0 accounts for non-LPR entries (undocumented, temporary-to-permanent, etc.)
+    # >1.0 accounts for non-LPR entries (undocumented, temporary-to-permanent, etc.).
+    # NOTE: this is a modeling ASSUMPTION, not a measured constant, and it is the
+    # single most consequential free parameter. Empirically the 2020 majority share
+    # moves ~25% (mult=1.0) -> ~21% (1.15) -> ~18% (1.30); the sensitivity grid
+    # brackets it over 1.00-1.30 so the headline is reported as a range, not a point.
     immigration_flow_multiplier: float = 1.15
     # Differential fertility between old-stock and immigrant-descended (non-
     # qualifying) parents. When native_fertility_differential is True (default),
     # the per-decade ratio is sourced from data/fertility_by_nativity.csv
     # (Haines white fertility by nativity, HSUS Millennial Ed. 2006, for the
-    # historical anchors; Census ACS own-children rates for the modern anchors)
-    # and these
-    # two scalar multipliers are used only as a fallback when no data row exists.
+    # historical anchors; Census ACS own-children rates for the modern anchors).
+    # In the default run EVERY decade has a cited ratio, so the two scalar
+    # multipliers below are NEVER reached -- they are a pure fallback for a
+    # hypothetical missing data row (verified: no decade triggers them).
     native_fertility_differential: bool = True
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
     # Fraction of parent pairs formed by random cross-population sampling vs.
     # assortative mating within ancestry bins. 0.35 admits real mixing without
     # letting trace ancestry diffuse to nearly everyone within a few generations
-    # (pure random mating would overstate the "any ancestor" share).
+    # (pure random mating would overstate the "any ancestor" share). ASSUMPTION,
+    # but verified near-irrelevant to the majority share (21.2%-22.2% across the
+    # full 0.0-1.0 range); it mainly shapes the "any ancestor" diffusion.
     random_mating_rate: float = 0.35
     # Clamp the TFR->turnover conversion to a plausible band so extreme TFR inputs
     # cannot imply an implausible share of the population being newborns per decade
     # (~20% floor at low fertility, ~42% ceiling at 19th-century-high fertility).
+    # The turnover formula coefficients are a demographic approximation, NOT measured
+    # values; verified non-driving (fixing turnover at a flat 0.30 moves the majority
+    # share by <0.1pp) because births on average preserve the population's mean q.
     min_decennial_turnover: float = 0.20
     max_decennial_turnover: float = 0.42
     # "Any ancestor": q strictly above ~0 (1e-6 epsilon ignores float round-off so
