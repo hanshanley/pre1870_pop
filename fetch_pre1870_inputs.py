@@ -159,6 +159,13 @@ EV_2024 = {
 # Gross lawful permanent resident admissions by decade (persons).
 # Source: DHS/OHSS Yearbook of Immigration Statistics, Table 1.
 # Pre-1820 values are zero because systematic immigration records begin in 1820.
+# Convention: keyed by decade START year, fiscal-year decades (e.g. 1820 = FY1820-1829,
+# 1900 = FY1900-1909), rounded to the nearest thousand. This is a human-readable
+# REFERENCE series only. The simulation itself does NOT read this file; it consumes
+# the precise, unrounded decade totals (binned to the decade ENDING at each census
+# year, e.g. 1901-1910 = 8,795,386) in data/national_decade_data.csv. The two files
+# therefore differ by one year in binning and by rounding; both are DHS/Historical
+# Statistics figures, neither is invented.
 
 DHS_LPR_BY_DECADE = {
     1790: 0, 1800: 0, 1810: 0, 1820: 129_000, 1830: 538_000, 1840: 1_427_000,
@@ -361,7 +368,9 @@ def write_static_inputs() -> None:
         })
     write_csv(DATA_DIR / "state_fips_2024_electoral_votes.csv", rows)
 
-    # Immigration admissions time series
+    # Immigration admissions time series (human-readable reference; see the
+    # DHS_LPR_BY_DECADE convention note above). The model reads the precise series
+    # in data/national_decade_data.csv instead, so this file is documentation only.
     immigration_rows = []
     for decade, admissions in sorted(DHS_LPR_BY_DECADE.items()):
         immigration_rows.append({
@@ -369,7 +378,9 @@ def write_static_inputs() -> None:
             "gross_lpr_admissions": admissions,
             "source": "DHS/OHSS Yearbook of Immigration Statistics Table 1",
             "source_url": "https://ohss.dhs.gov/topics/immigration/yearbook/2023/table1",
-            "notes": "Static model input; update from source if DHS revises table or newer yearbook is desired.",
+            "notes": "Reference series only (fiscal-year decades, rounded to thousands); "
+                     "NOT read by the model. The simulation uses the precise decade totals "
+                     "in data/national_decade_data.csv (immigrant_admissions_prev_decade).",
         })
     write_csv(DATA_DIR / "dhs_lpr_by_decade.csv", immigration_rows)
 
