@@ -180,15 +180,20 @@ class StateAgentModelParams:
     restrict_to_white_1870: bool = True
     # >1.0 scales gross LPR admissions up to approximate total immigrant entries
     # (undocumented, temporary-to-permanent, pre-1906 unrecorded arrivals, etc.).
+    # ASSUMPTION, not a measured constant; it is the most consequential free
+    # parameter (see the national ModelParams for the verified sensitivity range).
     immigration_flow_multiplier: float = 1.15
     native_fertility_differential: bool = True
     # Fallback fertility weights (old-stock slightly below, immigrant-descended
-    # slightly above replacement) used only when no cited per-decade ratio exists.
+    # slightly above replacement) used ONLY when a decade has no cited ratio. In
+    # the default run every decade has a cited Haines/CIS ratio, so these are
+    # never reached (verified) -- the data-driven differential is always active.
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
     # Fraction of births paired by random vs. assortative (within-ancestry-bin)
     # mating. 0.35 keeps some mixing without letting trace ancestry diffuse to
     # nearly everyone within a few generations (pure random mating overstates "any").
+    # ASSUMPTION, but verified near-irrelevant to the majority share.
     random_mating_rate: float = 0.35
     # Decennial birth-turnover is clamped to this band so extreme TFR inputs can't
     # produce implausible generational replacement (~20%-42% of population per decade).

@@ -80,14 +80,25 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 
 # ── National calibration anchors ────────────────────────────────────────────
-# These values come from the companion national agent-based model and serve as
-# targets for the state-level calibration step. They ensure that population-
-# weighted state averages match the national estimate.
+# Targets for the reduced-form (Method A) state calibration step so that
+# population-weighted state averages reproduce a national figure. NOTE: these are
+# the legacy reduced-form anchors; the HEADLINE state map and EC cartogram come
+# from the agent model (Method B, state_agent_ancestry_model.py), which calibrates
+# to nothing and derives shares directly from NHGIS census White-shares.
 
+# 2020 foreign-born share of the U.S. population (Census ACS 5-year B05002);
+# matches national_decade_data.csv foreign_born_share_target for 2020 (0.146).
 NATIONAL_FOREIGN_BORN_SHARE = 0.146
+# U.S. second-generation share (U.S.-born with >=1 foreign-born parent), ~12.7%,
+# Census CPS/ACS parental-nativity tabulations.
 NATIONAL_SECOND_GEN_SHARE = 0.127
+# Of that second generation, the share with exactly one native-born parent (~41.3%),
+# from the same Census parental-nativity tabulations.
 NATIONAL_ONE_NATIVE_PARENT_AMONG_SECOND_GEN = 0.413
 
+# Default Method-A calibration targets (reduced-form central case). These are the
+# legacy reduced-form national estimates, NOT the current agent-model output, and
+# are overridable via the --national-*-anchor CLI flags.
 DEFAULT_NATIONAL_ANCHORS = {
     "average_qualifying_ancestry": 0.417,
     "any_qualifying_ancestor_share": 0.662,
@@ -165,27 +176,32 @@ class ModelParams:
     # total minus excluded Black share (for non-Black-denominator comparisons).
     denominator: str = "all"
 
-    # Second-generation proxy parameters. The exponent < 1 prevents the proxy
-    # from exploding in very high-immigration states.
+    # Second-generation proxy parameters (reduced-form Method A heuristics, not
+    # measured). The exponent < 1 prevents the proxy from exploding in very
+    # high-immigration states; min/max bound it to a plausible 1.5%-33% band.
     second_gen_elasticity: float = 0.70
     second_gen_min: float = 0.015
     second_gen_max: float = 0.330
 
     # Share of second-generation people with one native-born parent.
-    # Higher in low-immigration states, lower in gateway states.
+    # Higher in low-immigration states, lower in gateway states. Negative
+    # elasticity encodes that inverse relationship; bounds keep it in 25%-55%.
     one_native_parent_national: float = NATIONAL_ONE_NATIVE_PARENT_AMONG_SECOND_GEN
     one_native_parent_elasticity: float = -0.25
     one_native_parent_min: float = 0.250
     one_native_parent_max: float = 0.550
 
     # Baseline ancestry-metric shares among non-Black third-plus-generation
-    # residents in an average state. Adjusted by old_stock_factor and
-    # fertility_factor per state.
+    # residents in an average state, then adjusted by old_stock_factor and
+    # fertility_factor per state. Calibrated (Method A) so the population-weighted
+    # national result lands on the DEFAULT_NATIONAL_ANCHORS above; heuristic, not
+    # directly observed (the agent model, Method B, is the headline method).
     base_any_third_plus: float = 0.84
     base_avg_third_plus: float = 0.65
     base_primary_third_plus: float = 0.60
 
-    # Hard bounds to prevent impossible reduced-form outputs
+    # Hard bounds so the reduced-form arithmetic cannot emit impossible shares
+    # (e.g. >94% with-any-ancestor or <5% primary) for an outlier state.
     any_min: float = 0.25
     any_max: float = 0.94
     avg_min: float = 0.10
