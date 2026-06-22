@@ -176,7 +176,10 @@ class ModelParams:
     Default values represent the central-case assumptions. The sensitivity grid
     tests variations around these.
     """
+    # 300k agents keeps Monte-Carlo noise on the national share well under a
+    # percentage point while still running in a few seconds.
     n_agents: int = 300_000
+    # Fixed seed for reproducibility; 1870 is a mnemonic for the simulation's base year.
     seed: int = 1870
     restrict_to_white_1870: bool = True
     count_1870_foreign_born_as_qualifying: bool = True
@@ -194,11 +197,17 @@ class ModelParams:
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
     # Fraction of parent pairs formed by random cross-population sampling vs.
-    # assortative mating within ancestry bins.
+    # assortative mating within ancestry bins. 0.35 admits real mixing without
+    # letting trace ancestry diffuse to nearly everyone within a few generations
+    # (pure random mating would overstate the "any ancestor" share).
     random_mating_rate: float = 0.35
+    # Clamp the TFR->turnover conversion to a plausible band so extreme TFR inputs
+    # cannot imply an implausible share of the population being newborns per decade
+    # (~20% floor at low fertility, ~42% ceiling at 19th-century-high fertility).
     min_decennial_turnover: float = 0.20
     max_decennial_turnover: float = 0.42
-    # Thresholds for "any ancestor" and "primary/majority" ancestry metrics
+    # "Any ancestor": q strictly above ~0 (1e-6 epsilon ignores float round-off so
+    # only genuine zero-ancestry agents are excluded). "Primary/majority": q > 0.50.
     any_threshold: float = 1e-6
     primary_threshold: float = 0.50
 
@@ -261,6 +270,8 @@ def turnover_from_tfr(tfr: float, params: ModelParams) -> float:
     represented as new births per decade. High 19th-century fertility (~4.5)
     raises this to ~37%; low modern fertility (~1.6) drops it to ~25%.
     """
+    # Linear fit: 0.27 baseline turnover at replacement TFR (2.1), sloped by 0.04
+    # per unit TFR above/below replacement (anchors in the docstring above).
     raw = 0.27 + 0.04 * (tfr - 2.1)
     return float(np.clip(raw, params.min_decennial_turnover, params.max_decennial_turnover))
 

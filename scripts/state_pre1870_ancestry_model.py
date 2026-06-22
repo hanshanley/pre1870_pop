@@ -291,6 +291,8 @@ def second_generation_proxy(foreign_born_share: float, params: ModelParams) -> f
     """
     ratio = foreign_born_share / NATIONAL_FOREIGN_BORN_SHARE
     raw = NATIONAL_SECOND_GEN_SHARE * safe_pow(ratio, params.second_gen_elasticity)
+    # Upper cap also can't exceed 0.95 - fb so first+second gen leave >=5% for the
+    # third-plus (old-stock) generation, even in the highest-immigration states.
     return clip(raw, params.second_gen_min, min(params.second_gen_max, 0.95 - foreign_born_share))
 
 
@@ -321,6 +323,8 @@ def raw_state_estimate(inp: StateInput, params: ModelParams) -> StateEstimate:
     pre-1870 ancestry. Second-generation residents with one native parent
     get partial credit.
     """
+    # Cap foreign-born share at 0.60: no U.S. state approaches this, so a higher
+    # value signals bad input and would break the generational decomposition below.
     fb = clip(inp.foreign_born_share, 0.0, 0.60)
     second = second_generation_proxy(fb, params)
     third_plus = clip(1.0 - fb - second, 0.0, 1.0)
@@ -330,7 +334,7 @@ def raw_state_estimate(inp: StateInput, params: ModelParams) -> StateEstimate:
     nonblack_third_plus_pool = max(0.0, third_plus - excluded_black_pool)
 
     if params.denominator == "nonblack":
-        denom = max(1e-9, 1.0 - excluded_black_pool)
+        denom = max(1e-9, 1.0 - excluded_black_pool)  # 1e-9 floor guards against divide-by-zero
     else:
         denom = 1.0
 
@@ -513,6 +517,12 @@ def make_sensitivity(estimates_inputs: Sequence[StateInput], base_params: ModelP
 
     Varies national anchors, Black exclusion weight, second-generation elasticity,
     and old-stock factors to produce a range of plausible estimates.
+
+    The "low"/"high" multipliers are roughly +/-10-15% brackets around each central
+    anchor (the larger downward cut on "any"/"primary" reflects their wider
+    uncertainty); old_stock_factor is shifted +/-8% and the trailing scalar
+    (0.92/1.00/1.08) is the per-scenario old-stock multiplier. Anchors are also
+    capped (e.g. 0.90/0.95/0.85) so the high scenario stays demographically possible.
     """
     scenarios = [
         ("low", replace(
@@ -521,7 +531,7 @@ def make_sensitivity(estimates_inputs: Sequence[StateInput], base_params: ModelP
             national_any_anchor=base_params.national_any_anchor * 0.86,
             national_primary_anchor=base_params.national_primary_anchor * 0.85,
             black_exclusion_weight=min(1.0, base_params.black_exclusion_weight + 0.10),
-            second_gen_elasticity=0.80,
+            second_gen_elasticity=0.80,  # higher elasticity -> more 2nd-gen -> less old-stock
         ), 0.92),
         ("central", base_params, 1.00),
         ("high", replace(
@@ -530,7 +540,7 @@ def make_sensitivity(estimates_inputs: Sequence[StateInput], base_params: ModelP
             national_any_anchor=min(0.95, base_params.national_any_anchor * 1.14),
             national_primary_anchor=min(0.85, base_params.national_primary_anchor * 1.15),
             black_exclusion_weight=max(0.0, base_params.black_exclusion_weight - 0.10),
-            second_gen_elasticity=0.60,
+            second_gen_elasticity=0.60,  # lower elasticity -> less 2nd-gen -> more old-stock
         ), 1.08),
     ]
     rows: List[Dict[str, object]] = []

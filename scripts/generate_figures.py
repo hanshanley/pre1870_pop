@@ -78,7 +78,11 @@ plt.rcParams.update({
     "axes.spines.right": False,
 })
 
-# Shared tile layout for both state cartograms.
+# Shared tile layout for both state cartograms: a hand-tuned (col, row) grid that
+# approximates each state's geographic position while decluttering the dense
+# Northeast. Origin top-left; col increases eastward, row increases southward
+# (row is negated at draw time so north renders up). Values are positional only,
+# not data, so they never change with the model output.
 TILE = {
     'AK': (0, 0), 'ME': (10, 0),
     'WI': (5, 1), 'VT': (9, 1), 'NH': (10, 1),
@@ -207,6 +211,8 @@ def load_state_table():
 def fig_state_map(df_state):
     wha_cmap = LinearSegmentedColormap.from_list(
         "wha", ["#E8DFCE", SUBSTACK_GOLD, SUBSTACK_ACCENT, "#7B2D26"], N=256)
+    # Color scale spans the observed range of state estimates: ~10% (lowest, e.g.
+    # CA/HI/NV) to ~75% (highest, e.g. WV/ME/VT), so the full palette is used.
     norm = plt.Normalize(vmin=10, vmax=75)
     fig, ax = plt.subplots(1, 1, figsize=(14, 8))
     ax.set_axis_off()
@@ -250,7 +256,16 @@ def _pack_state_blocks(df_state, unit=1.0, gap=0.5, anchor_scale=4.0, iters=4000
     its anchor to preserve geography and (b) remove overlaps until the layout fully
     converges with no two blocks colliding (Demers-style cartogram). No centroid
     gravity: that pulls blocks into overlaps faster than they can separate, which
-    leaves an ugly blob; pure overlap-resolution gives a clean, compact packing."""
+    leaves an ugly blob; pure overlap-resolution gives a clean, compact packing.
+
+    Tuning defaults:
+      unit=1.0          one square per electoral vote (the drawing unit).
+      gap=0.5           half-cell breathing room between blocks so borders read.
+      anchor_scale=4.0  spreads the coarse integer TILE grid out far enough that
+                        even large states start mostly separated (less to untangle).
+      iters=4000        empirically enough for every layout here to converge; the
+                        loop breaks early once no block moves, so it rarely runs all.
+    """
     blocks = []
     for _, row in df_state.iterrows():
         abbr = row["abbr"]
@@ -268,11 +283,14 @@ def _pack_state_blocks(df_state, unit=1.0, gap=0.5, anchor_scale=4.0, iters=4000
             "ax": ax_, "ay": ay_, "cx": ax_, "cy": ay_,
         })
     for _ in range(iters):
-        for b in blocks:  # weak pull toward geographic anchor
+        for b in blocks:
+            # Pull 2% of the way toward the geographic anchor each iteration: weak
+            # enough that overlap-resolution wins (preventing blobs), strong enough
+            # that blocks still settle near their true map position.
             b["cx"] += 0.02 * (b["ax"] - b["cx"])
             b["cy"] += 0.02 * (b["ay"] - b["cy"])
         moved = False
-        for _pass in range(4):  # several separation passes per iteration for convergence
+        for _pass in range(4):  # 4 separation passes/iter: clears multi-way pileups before the next pull
             for i in range(len(blocks)):
                 for j in range(i + 1, len(blocks)):
                     a, b = blocks[i], blocks[j]
@@ -296,6 +314,9 @@ def fig_ec_cartogram(df_state):
     unit = 1.0
     ev_cmap = LinearSegmentedColormap.from_list(
         "ev_change", [SUBSTACK_BLUE, "#9DBFCC", SUBSTACK_BG, "#D4956A", SUBSTACK_ACCENT], N=256)
+    # Diverging scale centered at 0 (no change). Asymmetric bounds match the
+    # asymmetric outcome: the biggest loser (CA) sheds ~25-30 EV while the biggest
+    # gainer (IN) adds only ~10-16, so the blue side runs deeper than the red side.
     ev_norm = TwoSlopeNorm(vmin=-25, vcenter=0, vmax=10)
     blocks = _pack_state_blocks(df_state, unit=unit)
 

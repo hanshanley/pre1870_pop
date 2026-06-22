@@ -163,18 +163,43 @@ MODERN_FIPS = {
 
 @dataclass
 class StateAgentModelParams:
+    """Tunable parameters for the state-level agent model.
+
+    These mirror the national ``pre1870_ancestry_model.ModelParams`` (the state
+    model reuses the national draw_parents/turnover/fertility helpers), so the
+    shared defaults are kept identical on purpose to keep the two models
+    consistent. See that dataclass for the fuller rationale of each value.
+    """
+    # 300k agents: large enough that Monte-Carlo noise on a state share is well
+    # under a percentage point, yet small enough to run all 51 states in seconds.
     n_agents: int = 300_000
+    # Fixed seed for reproducibility; 1870 chosen as a mnemonic for the base year.
     seed: int = 1870
+    # Default definition counts only residents enumerated as White in 1870 as
+    # qualifying source stock (Black/AIAN/other excluded). Flipped by --include-nonwhite-1870.
     restrict_to_white_1870: bool = True
+    # >1.0 scales gross LPR admissions up to approximate total immigrant entries
+    # (undocumented, temporary-to-permanent, pre-1906 unrecorded arrivals, etc.).
     immigration_flow_multiplier: float = 1.15
     native_fertility_differential: bool = True
+    # Fallback fertility weights (old-stock slightly below, immigrant-descended
+    # slightly above replacement) used only when no cited per-decade ratio exists.
     old_stock_fertility_multiplier: float = 0.98
     nonqualifying_fertility_multiplier: float = 1.03
+    # Fraction of births paired by random vs. assortative (within-ancestry-bin)
+    # mating. 0.35 keeps some mixing without letting trace ancestry diffuse to
+    # nearly everyone within a few generations (pure random mating overstates "any").
     random_mating_rate: float = 0.35
+    # Decennial birth-turnover is clamped to this band so extreme TFR inputs can't
+    # produce implausible generational replacement (~20%-42% of population per decade).
     min_decennial_turnover: float = 0.20
     max_decennial_turnover: float = 0.42
+    # "Any qualifying ancestor" = q strictly above ~0 (tiny epsilon avoids float
+    # round-off counting genuine zeros). "Primary/majority" = more than half (>0.50).
     any_threshold: float = 1e-6
     primary_threshold: float = 0.50
+    # Floor on agents per state so small states keep enough sample to estimate a
+    # share; 50 bounds per-state Monte-Carlo error while staying within the budget.
     min_agents_per_state: int = 50
 
 
@@ -342,7 +367,7 @@ def simulate_states(
             * decade.immigrant_admissions_prev_decade
             / decade.total_population
         ) if year > 1870 else 0.0
-        national_imm_share = min(national_imm_share, 0.25)
+        national_imm_share = min(national_imm_share, 0.25)  # cap matches national model: no decade had >~25% net new entrants
 
         # Distribute immigrants to states by their foreign-born share increase
         state_fb_weights = {}
@@ -391,8 +416,10 @@ def simulate_states(
                 carry_q = np.array([], dtype=np.float64)
 
             if n_births > 0 and n_state >= 2:
+                # Need at least 2 residents to sample two distinct parents.
                 children_q = draw_parents(state_q, n_births, decade_nat_params, rng)
             elif n_births > 0:
+                # Degenerate single-agent state: clone the lone resident's ancestry.
                 children_q = np.full(n_births, state_q.mean() if n_state > 0 else 0.0)
             else:
                 children_q = np.array([], dtype=np.float64)
