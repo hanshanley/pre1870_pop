@@ -145,6 +145,33 @@ So `q` is not a vague "score" — it is, by construction, the fraction of a pers
 ancestry tree that traces to the 1870 White source stock. That is precisely the
 quantity the project sets out to estimate.
 
+### Where the fertility differential comes from
+
+The per-decade immigrant:native fertility ratio in `data/fertility_by_nativity.csv`
+is **not invented** — every row is tagged in its `basis`/`source` columns as one of
+**CITED**, **INTERPOLATED**, or **ASSUMPTION**, and traces to two published anchors:
+
+| Decade(s) | Ratio | Where it comes from |
+|---|---|---|
+| **1900–1910** (CITED) | 1.35 | Michael R. Haines, *white total fertility rate by nativity*, **Historical Statistics of the United States: Millennial Edition** (Cambridge Univ. Press, 2006). Foreign-born white TFR ran ~⅓ above native-born white. |
+| **2008** → 2010 slot (CITED) | 1.33 | U.S. Census Bureau **American Community Survey (2008)**, TFR by nativity via the own-children method: native **2.07** vs immigrant **2.75**. Computation by Camarota & Zeigler, **Center for Immigration Studies (2020)**. |
+| **2018** → 2020 slot (CITED) | 1.24 | U.S. Census Bureau **ACS (2018)**, same method: native **1.74** vs immigrant **2.15**. Same CIS (2020) report. |
+| **1870–1890** (ASSUMPTION) | 1.35 | Held flat at the 1900–1910 Haines anchor — no nativity-specific fertility series exists this far back. |
+| **1920–2000** (INTERPOLATED) | 1.34→1.33 | Linearly interpolated between the 1910 Haines anchor and the 2008 ACS anchor; mid-century values are not independently measured. |
+
+Sources (also stored in the CSV's `source_url` column):
+
+- Haines, *Fertility and Mortality in the United States*:
+  <https://eh.net/encyclopedia/fertility-and-mortality-in-the-united-states/>
+- U.S. Census Bureau ACS: <https://www.census.gov/programs-surveys/acs>
+- Camarota & Zeigler, CIS (2020):
+  <https://cis.org/Report/Immigrant-and-NativeBorn-Fertility-2008-2018>
+
+Only the **two endpoints (Haines ~1910 and ACS/CIS 2008 & 2018) are independently
+measured**; the pre-1900 and mid-century rows are explicitly flagged as held-flat or
+interpolated, so a reader can see exactly which numbers are data and which are
+bridging assumptions. (See also [ASSUMPTIONS.md](ASSUMPTIONS.md).)
+
 ---
 
 ## 5. Monte-Carlo: why we run it several times
