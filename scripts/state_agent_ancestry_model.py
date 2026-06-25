@@ -23,7 +23,7 @@ historical panel to anchor immigration and internal migration flows.
 Usage
 -----
     python scripts/state_agent_ancestry_model.py --output outputs/state_agent_estimates.csv
-    python scripts/state_agent_ancestry_model.py --n-agents 500000 --seeds 1870,1871,1872
+    python scripts/state_agent_ancestry_model.py --n-agents 1000000 --seeds 1870,1871,1872,1873,1874
 
 Requires: Python 3.9+, numpy.
 """
@@ -170,9 +170,13 @@ class StateAgentModelParams:
     shared defaults are kept identical on purpose to keep the two models
     consistent. See that dataclass for the fuller rationale of each value.
     """
-    # 300k agents: large enough that Monte-Carlo noise on a state share is well
-    # under a percentage point, yet small enough to run all 51 states in seconds.
-    n_agents: int = 300_000
+    # 1M agents is a Monte-Carlo sample-size vs. runtime tradeoff (runs all 51
+    # states in a few seconds), NOT a derived precision target. Agents are
+    # allocated per state proportional to population, so large states reach well
+    # under 1pp sampling noise on their share; small states are noisier and are
+    # protected by min_agents_per_state below. Raise --n-agents and/or add seeds
+    # for tighter estimates (variance falls as 1/sqrt(total draws)).
+    n_agents: int = 1_000_000
     # Fixed seed for reproducibility; 1870 chosen as a mnemonic for the base year.
     seed: int = 1870
     # Default definition counts only residents enumerated as White in 1870 as
@@ -204,8 +208,11 @@ class StateAgentModelParams:
     any_threshold: float = 1e-6
     primary_threshold: float = 0.50
     # Floor on agents per state so small states keep enough sample to estimate a
-    # share; 50 bounds per-state Monte-Carlo error while staying within the budget.
-    min_agents_per_state: int = 50
+    # share. The floor caps a state's worst-case Monte-Carlo SE at
+    # sqrt(p(1-p)/floor): 500 -> ~2.2pp at p=0.5, vs ~7pp at 50. It "borrows" from
+    # the proportional budget but at negligible total cost (<=51*500 agents) and
+    # introduces no bias (each state is estimated from its own agents).
+    min_agents_per_state: int = 500
 
 
 def get_state_pop_target(
@@ -635,9 +642,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="State-level agent-based ancestry simulation."
     )
-    parser.add_argument("--n-agents", type=int, default=300_000)
-    parser.add_argument("--seeds", default="1870",
-                        help="Comma-separated seeds for multi-run averaging.")
+    parser.add_argument("--n-agents", type=int, default=1_000_000)
+    parser.add_argument("--seeds", default="1870,1871,1872,1873,1874",
+                        help="Comma-separated seeds for multi-run averaging. The "
+                             "reported share is the seed-mean; the spread across "
+                             "seeds is an empirical Monte-Carlo error estimate.")
+    parser.add_argument("--min-agents-per-state", type=int, default=500,
+                        help="Floor on agents allocated to each state, so small "
+                             "states keep enough sample to estimate a stable share "
+                             "(caps worst-case per-state SE at sqrt(p(1-p)/floor)).")
     parser.add_argument("--output", type=pathlib.Path,
                         default=ROOT / "outputs" / "state_agent_estimates.csv")
     parser.add_argument("--nhgis-panel", type=pathlib.Path,
@@ -671,6 +684,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     seeds = [int(s) for s in args.seeds.split(",")]
     params = StateAgentModelParams(
         n_agents=args.n_agents,
+        min_agents_per_state=args.min_agents_per_state,
         restrict_to_white_1870=not args.include_nonwhite_1870,
         native_fertility_differential=not args.no_native_fertility,
     )

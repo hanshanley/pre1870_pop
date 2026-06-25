@@ -56,20 +56,22 @@ and
 
 ![Immigration by region, small multiples](outputs/immigration_by_region_small_multiples.png)
 
-## Two state-level models
+## State-level model
 
-Both models define the qualifying ("White Heritage American") source stock as
-residents enumerated as **White** in the 1870 Census — Black, American Indian /
-Alaska Native, and other non-white (e.g. Chinese) 1870 residents are excluded from
-the qualifying stock but remain in the present-day denominator.
+The qualifying ("White Heritage American") source stock is defined as residents
+enumerated as **White** in the 1870 Census — Black, American Indian / Alaska
+Native, and other non-white (e.g. Chinese) 1870 residents are excluded from the
+qualifying stock but remain in the present-day denominator.
 
-The project implements two independent approaches to state-level estimation:
-
-**Method A — Reduced-form model** (`state_pre1870_ancestry_model.py`): Uses ACS foreign-born and Black-alone shares with calibration to national anchors. Fast but relies on hand-set `old_stock_factor` priors per state, which also absorb residual non-white / non-old-stock population (it does not subtract AIAN/other races explicitly).
-
-**Method B — Agent-based simulation** (`state_agent_ancestry_model.py`): Runs 300K agents through 1870-2020 using historical Census data from NHGIS (population, race, and nativity by state per decade). The 1870 qualifying stock is seeded from each state's enumerated **White** share (excluding Black, AIAN, and other races); immigrant-descended agents reproduce at the cited per-decade foreign-born:native fertility ratio (`data/fertility_by_nativity.csv`). State differences emerge from the simulation — no hand-set factors. This is the method behind the headline state map and EC cartogram.
-
-The notebook runs both and compares results.
+State-level estimates come from an **agent-based simulation**
+(`state_agent_ancestry_model.py`): 1M agents are run through 1870-2020 using
+historical Census data from NHGIS (population, race, and nativity by state per
+decade). The 1870 qualifying stock is seeded from each state's enumerated
+**White** share (excluding Black, AIAN, and other races); immigrant-descended
+agents reproduce at the cited per-decade foreign-born:native fertility ratio
+(`data/fertility_by_nativity.csv`). State differences emerge from the simulation
+— there are no hand-set per-state factors. This is the method behind the headline
+state map and EC cartogram.
 
 ## Data sources
 
@@ -153,8 +155,14 @@ python scripts/pre1870_ancestry_model.py --sensitivity
 ### 4. Run the state-level agent-based model
 
 ```bash
-python scripts/state_agent_ancestry_model.py --n-agents 300000 --seeds 1870,1871,1872
+# Defaults: 1,000,000 agents, 5 seeds, a 500-agent-per-state floor
+python scripts/state_agent_ancestry_model.py
+# ...or override any of them
+python scripts/state_agent_ancestry_model.py --n-agents 1000000 --seeds 1870,1871,1872,1873,1874 --min-agents-per-state 500
 ```
+
+See **[HOW_THE_MODEL_WORKS.md](HOW_THE_MODEL_WORKS.md)** for a plain-language walkthrough
+of the agent budget, the Monte-Carlo simulation, and how the ancestry "tree" is tracked.
 
 ### 5. Run the Electoral College reapportionment
 
@@ -243,6 +251,7 @@ This project uses NHGIS data. If you use these results, cite:
 
 ## Documentation
 
+- **[HOW_THE_MODEL_WORKS.md](HOW_THE_MODEL_WORKS.md)** — Plain-language walkthrough of the code: the agent budget, the Monte-Carlo simulation, and the ancestry "tree"
 - **[MATH_AND_METHODS.md](MATH_AND_METHODS.md)** — Full mathematical specification
 - **[ASSUMPTIONS.md](ASSUMPTIONS.md)** — Model assumptions and sensitivity parameters
 
