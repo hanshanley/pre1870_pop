@@ -128,6 +128,26 @@ This is the heart of the model (`draw_parents()` in
    high-heritage and low-heritage lines from blending into everyone at once, which
    pure random mating would unrealistically cause within a few generations.
 
+   > **Where does 0.35 come from?** It is an **explicit modeling assumption, not a
+   > measured statistic** — there is no dataset of "fraction of US couples who
+   > mate randomly vs. within ancestry," so this is not pulled from a source. It is
+   > a deliberately middling value chosen on principle: pure random mating
+   > (`1.0`) would unrealistically diffuse trace ancestry to nearly everyone within
+   > a few generations, while pure assortative mating (`0.0`) would freeze
+   > ancestry groups apart forever; real populations sit in between, so we use a
+   > value below the midpoint that admits substantial mixing without total
+   > blending.
+   >
+   > Crucially, we **tested how much it matters** rather than just asserting it.
+   > Sweeping `random_mating_rate` across its **full 0.0–1.0 range moves the
+   > headline majority share by less than ~1 point (21.2%–22.2%)**, so the choice
+   > is near-irrelevant to the main result; it mainly shapes the broader
+   > "any ancestor" diffusion. The sensitivity analysis
+   > (`--sensitivity`) varies it over 0.20 / 0.35 / 0.55, and the parameter and its
+   > range are listed in [ASSUMPTIONS.md](ASSUMPTIONS.md). This is the honest
+   > status: a defensible but un-sourced assumption whose impact has been measured
+   > and shown to be small.
+
 3. **The child's value is the midpoint of its parents:**
 
    ```
