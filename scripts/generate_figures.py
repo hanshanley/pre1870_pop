@@ -209,11 +209,15 @@ def load_state_table():
 
 
 def fig_state_map(df_state):
+    # Cool sequential ramp (mint -> teal -> deep slate-blue). Chosen to contrast
+    # with the warm tan (#F7F5F0) background: the old warm ramp started in tan and
+    # — since most states sit at 7-33% — left the bulk of the map an indistinct tan.
     wha_cmap = LinearSegmentedColormap.from_list(
-        "wha", ["#E8DFCE", SUBSTACK_GOLD, SUBSTACK_ACCENT, "#7B2D26"], N=256)
-    # Color scale spans the observed range of state estimates: ~10% (lowest, e.g.
-    # CA/HI/NV) to ~75% (highest, e.g. WV/ME/VT), so the full palette is used.
-    norm = plt.Normalize(vmin=10, vmax=75)
+        "wha", ["#D5E4DD", "#8FBDB0", "#4F9088", "#2E6B72", "#1F3D52"], N=256)
+    # Color scale spans the observed range of state estimates (~7% lowest, e.g.
+    # CA/HI/NV, to ~64% highest, e.g. WV) so the full palette is used rather than
+    # compressing the data-dense low end into one flat color.
+    norm = plt.Normalize(vmin=5, vmax=65)
     fig, ax = plt.subplots(1, 1, figsize=(14, 8))
     ax.set_axis_off()
     for _, row in df_state.iterrows():
@@ -225,12 +229,17 @@ def fig_state_map(df_state):
         color = wha_cmap(norm(pct))
         rect = FancyBboxPatch((col - 0.45, -grow - 0.45), 0.9, 0.9,
                               boxstyle="round,pad=0.02", facecolor=color,
-                              edgecolor="#AEAAA0", linewidth=0.6)
+                              edgecolor="#9AA39C", linewidth=0.6)
         ax.add_patch(rect)
+        # Adaptive label: white text (dark halo) on dark tiles, dark text (white
+        # halo) on light tiles, using the tile's relative luminance.
+        lum = 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]
+        txt_color = "white" if lum < 0.5 else SUBSTACK_TEXT
+        halo = SUBSTACK_TEXT if lum < 0.5 else "white"
         fs = 6 if abbr in ("DC", "RI", "DE", "CT", "NJ", "NH", "VT", "MA", "MD") else 7
         ax.annotate(f"{abbr}\n{pct:.0f}%", xy=(col, -grow), ha="center", va="center",
-                    fontsize=fs, fontweight="bold", color=SUBSTACK_TEXT,
-                    path_effects=[pe.withStroke(linewidth=2, foreground="white")])
+                    fontsize=fs, fontweight="bold", color=txt_color,
+                    path_effects=[pe.withStroke(linewidth=2, foreground=halo)])
     ax.autoscale_view()
     ax.set_aspect("equal")
     ax.margins(0.03)
