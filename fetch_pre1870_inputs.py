@@ -266,6 +266,12 @@ def parse_census_api_response(year: int, geo: str, data: list) -> list[dict]:
         if geo == "state":
             abbr_lookup = {fips: abbr for fips, abbr, _ in STATE_FIPS}
             abbr = abbr_lookup.get(state_fips, "")
+            if not abbr:
+                # Skip jurisdictions outside the model's universe (e.g. Puerto
+                # Rico, FIPS 72). The model counts only the 50 states + DC, so
+                # keeping these would make the file's population sum exceed the
+                # national total and risk double-counting if summed directly.
+                continue
         elif geo == "us":
             abbr = "US"
 
