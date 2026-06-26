@@ -1,9 +1,13 @@
 # How the model works
 
-A plain-language walkthrough of the headline state model
+A plain-language walkthrough of the headline **state** model
 (`scripts/state_agent_ancestry_model.py`): how the **agent budget** is spent, how
 the **Monte-Carlo simulation** runs decade by decade, and how the ancestry
-**"tree"** is tracked to estimate each person's pre-1870 White heritage.
+**"tree"** is tracked to estimate each person's pre-1870 White heritage. A
+**national** companion model (`scripts/pre1870_ancestry_model.py`) shares the same
+mechanics on one well-mixed population; [§7](#7-two-agent-based-models-and-why-they-differ)
+explains how the two relate and why their headline shares form a range, not a
+single number.
 
 This document explains the *code*. For the formal math see
 [MATH_AND_METHODS.md](MATH_AND_METHODS.md); for the input assumptions and their
@@ -32,8 +36,11 @@ alive in a state in 2020:
 | `any_qualifying_ancestor_share` | `mean(q > ~0)` | share with **any** pre-1870 White ancestor |
 | `primary_qualifying_ancestry_share` | `mean(q > 0.5)` | share whose ancestry is **majority** pre-1870 White |
 
-The national headline numbers (≈ **21% majority / 56% any** in 2020) are the
-population-weighted averages of these state results.
+The national headline numbers (≈ **21% majority / 56% any** in 2020) come from the
+**national** companion model (`pre1870_ancestry_model.py`), which runs these same
+agent mechanics on one well-mixed national population. The state model's
+population-weighted average is close but not identical (**≈ 20% majority / 54% any**);
+see [§7](#7-two-agent-based-models-and-why-they-differ) for why the two differ.
 
 ---
 
@@ -238,3 +245,50 @@ no point chasing it.
 | Cited fertility differential | `decade_fertility_multipliers()` + `data/fertility_by_nativity.csv` |
 | Multi-seed averaging | `run_multi_seed()` |
 | Tunable parameters (with rationale comments) | `StateAgentModelParams` dataclass |
+
+---
+
+## 7. Two agent-based models, and why they differ
+
+There are **two** agent-based simulations in this package. They share the same
+core mechanics (the `q` fraction, fertility-weighted births, the `q_child =
+midpoint` tree, the cited fertility differential) but differ in geographic
+resolution:
+
+| Model | File | Population | Used for |
+|---|---|---|---|
+| **National** | `pre1870_ancestry_model.py` | one well-mixed national pool | national time-series & headcount figures; the headline national share |
+| **State** | `state_agent_ancestry_model.py` | 50 states + DC, simulated separately with internal migration | the state map, the EC reapportionment, and a population-weighted national check |
+
+**They agree closely on the White-only headline:**
+
+| Metric (2020, White-only stock) | National | State (pop-weighted) |
+|---|---|---|
+| Majority (>50%) ancestry | **21.2%** | **19.8%** |
+| Any pre-1870 ancestor | **56.0%** | **53.7%** |
+| Average ancestry (mass) | **28.9%** | **27.2%** |
+
+So the defensible headline is a **range, ~20–21% majority / ~54–56% any**, not a
+single false-precision number. The state model reads slightly lower because it keeps
+lineages **regionally concentrated** — mating happens within a state, so high- and
+low-heritage populations blend more slowly than in the single national pool.
+
+### Sensitivity: counting all 1870 races as qualifying stock
+
+Both models expose `--include-nonwhite-1870`, which seeds the qualifying stock from
+the **entire** enumerated 1870 population (White, Black, AIAN, Chinese — every race
+present then) instead of White residents only:
+
+| Metric (2020, **all-race** 1870 stock) | National | State (pop-weighted) |
+|---|---|---|
+| Majority (>50%) ancestry | **29.2%** | **37.4%** |
+| Any pre-1870 ancestor | **60.5%** | **61.7%** |
+| Average ancestry (mass) | **35.8%** | **42.2%** |
+
+Here the two models diverge **more** (majority share **~29–37%**). The reason is
+geography: in 1870 the Black population was ~88% concentrated in the South. The
+**national** model dilutes those lineages into one national pool, while the
+**state** model lets them compound within Southern states across 15 decades of
+mostly within-state mating — so the state estimate runs substantially higher. The
+wider spread is itself the honest signal that this counterfactual is more
+geographically sensitive than the White-only headline.

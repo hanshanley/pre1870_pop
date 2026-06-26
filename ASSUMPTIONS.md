@@ -14,7 +14,9 @@ descendants. The qualifying source stock is the enumerated **White** 1870 popula
 (33,589,377; NHGIS `white` column), **not** `total − Black` (which would leave AIAN
 and other non-white residents in the stock). Counting **all** 1870 residents
 regardless of race (i.e. the full 1870 population) is available for sensitivity
-comparison via `--include-nonwhite-1870`.
+comparison via `--include-nonwhite-1870`; doing so raises the 2020 majority share
+from ~20–21% (White-only) to **~29% (national) / ~37% (state)** and the any-ancestor
+share to ~61%.
 
 **Included in qualifying stock**: White residents present by 1870, including
 White foreign-born residents already in the U.S. by 1870. The foreign-born

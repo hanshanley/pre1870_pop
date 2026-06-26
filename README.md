@@ -6,7 +6,21 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 
 ## Key findings (2020)
 
-- **~21%** of the U.S. population has *majority* (>50%) pre-1870 White Heritage ancestry; **~56%** has *any* pre-1870 White ancestor.
+The headline is bracketed by **two independent agent-based simulations** that both
+seed the 1870 White stock and trace ancestry forward to 2020: a **national** cohort
+model (`pre1870_ancestry_model.py`) and a **state-by-state** model
+(`state_agent_ancestry_model.py`). They agree closely:
+
+- **~20–21%** of the U.S. population has *majority* (>50%) pre-1870 White Heritage
+  ancestry (state model **19.8%** → national model **21.2%**); **~54–56%** has *any*
+  pre-1870 White ancestor (**53.7%** → **56.0%**).
+- **Sensitivity — counting *all* races present in 1870** (Black, AIAN, Chinese, etc.)
+  as qualifying stock instead of White-only (`--include-nonwhite-1870`) raises the
+  majority share to **~29–37%** (national **29.2%** → state **37.4%**) and the
+  any-ancestor share to **~61%**. The spread is wider here because the 1870 Black
+  population was heavily concentrated in the South, which the state model compounds
+  regionally while the national model mixes one well-blended pool. See
+  [HOW_THE_MODEL_WORKS.md](HOW_THE_MODEL_WORKS.md#7-two-agent-based-models-and-why-they-differ).
 - Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −29, FL −14, NY −13, MA −5, NJ −4**; biggest gainers **IN +16, OH +12, TN +10, MO +10, KY +9**.
 
 These figures use the cited per-decade foreign-born:native fertility differential
@@ -40,10 +54,10 @@ Each state is drawn as its own block of unit squares — **one square per electo
 vote** under the Heritage-American count — placed at its geographic position and
 packed so no two states overlap. Blocks are colored by the **electoral-vote change**
 versus actual 2024 (red = gains, blue = losses), and labeled with the state, its
-**actual → hypothetical EV**, and the change. California collapses (54 → 24, −30) and
-Florida (30 → 17) and New York (28 → 15) shrink sharply, while Indiana (11 → 27, +16),
-Ohio (17 → 28, +11), Missouri (10 → 20, +10), Kentucky (8 → 17, +9), and Tennessee
-(11 → 19, +8) expand.
+**actual → hypothetical EV**, and the change. California collapses (54 → 25, −29) and
+Florida (30 → 16) and New York (28 → 15) shrink sharply, while Indiana (11 → 27, +16),
+Ohio (17 → 29, +12), Tennessee (11 → 21, +10), Missouri (10 → 20, +10), and Kentucky
+(8 → 17, +9) expand.
 
 ### Legal immigration to the United States by region of origin, 1820-2016
 
@@ -77,6 +91,14 @@ agents reproduce at the cited per-decade foreign-born:native fertility ratio
 and `data/fertility_by_nativity.csv`). State differences emerge from the simulation
 — there are no hand-set per-state factors. This is the method behind the headline
 state map and EC cartogram.
+
+A **national** companion model (`pre1870_ancestry_model.py`) runs the same agent
+mechanics on a single well-mixed national population rather than state-by-state. It
+is faster and is the source of the national figures plotted in the time-series and
+headcount charts above; its 2020 majority share (**21.2%**) brackets the state
+model's population-weighted average (**19.8%**). See
+[HOW_THE_MODEL_WORKS.md](HOW_THE_MODEL_WORKS.md#7-two-agent-based-models-and-why-they-differ)
+for why the two differ.
 
 ## Data sources
 
