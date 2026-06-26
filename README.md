@@ -7,11 +7,16 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 ## Key findings (2020)
 
 - **~21%** of the U.S. population has *majority* (>50%) pre-1870 White Heritage ancestry; **~56%** has *any* pre-1870 White ancestor.
-- Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −30, NY −13, FL −13, MA −5, SC −4**; biggest gainers **IN +16, OH +11, MO +10, KY +9, TN +8**.
+- Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −29, FL −14, NY −13, MA −5, NJ −4**; biggest gainers **IN +16, OH +12, TN +10, MO +10, KY +9**.
 
 These figures use the cited per-decade foreign-born:native fertility differential
-(`data/fertility_by_nativity.csv`, default on). Disabling it (`--no-native-fertility`,
-unsourced constants) raises the majority share to ~35%. See [ASSUMPTIONS.md](ASSUMPTIONS.md).
+— sourced from **Michael R. Haines, white fertility by nativity, *Historical
+Statistics of the United States: Millennial Edition* (2006)** for the 1900–10 anchor
+and the **U.S. Census Bureau American Community Survey (2008, 2018), own-children TFR
+by nativity, as computed by Camarota & Zeigler, Center for Immigration Studies
+(2020)** for the modern anchors (transcribed in `data/fertility_by_nativity.csv`,
+default on). Disabling it (`--no-native-fertility`, unsourced constants) raises the
+majority share to ~35%. See [ASSUMPTIONS.md](ASSUMPTIONS.md).
 
 ## Key outputs
 
@@ -68,7 +73,8 @@ historical Census data from NHGIS (population, race, and nativity by state per
 decade). The 1870 qualifying stock is seeded from each state's enumerated
 **White** share (excluding Black, AIAN, and other races); immigrant-descended
 agents reproduce at the cited per-decade foreign-born:native fertility ratio
-(`data/fertility_by_nativity.csv`). State differences emerge from the simulation
+(from Haines 1900–10 and Census ACS / CIS 2008–2018; see the Data sources table
+and `data/fertility_by_nativity.csv`). State differences emerge from the simulation
 — there are no hand-set per-state factors. This is the method behind the headline
 state map and EC cartogram.
 
@@ -83,7 +89,7 @@ All model inputs are loaded from CSV files in `data/`, not hardcoded:
 | `nhgis_historical_state_panel_1790_1990.csv` | IPUMS NHGIS API extracts | State-level total, White, Black, AIAN, foreign-born by decade |
 | `modern_census_state_race_2000_2020.csv` | Census Bureau API (dec/sf1, dec/pl) | State-level total, Black, AIAN for 2000/2010/2020 |
 | `dhs_lpr_by_decade.csv` | DHS/OHSS Yearbook Table 1 | Gross LPR admissions by decade, 1820-2010 |
-| `fertility_by_nativity.csv` | Manhattan Institute (2023); Census ACS / CIS (Camarota & Zeigler 2020) | FB:native fertility ratio by decade (cited anchors; interpolation flagged) |
+| `fertility_by_nativity.csv` | Haines, white fertility by nativity (HSUS Millennial Ed. 2006) for 1900-10; Census ACS own-children TFR by nativity (2008, 2018) via Camarota & Zeigler, CIS (2020) | FB:native fertility ratio by decade (cited anchors; interpolation flagged) |
 | `dhs_lpr_by_country_decade.csv` | DHS/OHSS Yearbook 2016, Table 2 (pp. 6-11) | Verbatim country-level LPR admissions by decade, 1820-2016, tagged with each row's continent and assigned world region (the auditable raw extract) |
 | `immigration_by_region_decade.csv` | Derived from `dhs_lpr_by_country_decade.csv` | LPR admissions aggregated to world region by decade; built and validated by `scripts/build_immigration_by_region.py` |
 | `state_fips_2024_electoral_votes.csv` | National Archives | State FIPS codes and 2024 EV baseline |
