@@ -438,11 +438,11 @@ python fetch_pre1870_inputs.py --show-queries
 
 ### 8.4 Run the existing first-pass reapportionment model
 
-If `outputs/state_pre1870_estimates.csv` or a similar state estimate file exists:
+If `outputs/state_agent_estimates.csv` or a similar state estimate file exists:
 
 ```bash
 python scripts/hypothetical_ec_reapportionment.py \
-  --input outputs/state_pre1870_estimates.csv \
+  --input outputs/state_agent_estimates.csv \
   --metric primary \
   --output-csv outputs/hypothetical_ec_reapportionment_primary.csv \
   --output-html outputs/hypothetical_ec_reapportionment_primary_map.html
