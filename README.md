@@ -7,7 +7,6 @@ The model is a counterfactual apportionment exercise. It does not predict how an
 ## Key findings (2020)
 
 - **~21%** of the U.S. population has *majority* (>50%) pre-1870 White Heritage ancestry; **~56%** has *any* pre-1870 White ancestor.
-- Rebased to the nonblack population (mass basis), **~31%** traces to the pre-1870 White stock — matching the Manhattan Institute's independent cohort-component estimate of ~31% pre-1860 nonblack ([Lehman, 2023](https://manhattan.institute/article/who-pays-for-reparations-the-immigration-challenge-in-the-reparations-debate)). The two methods converge once both use the cited native-vs-immigrant fertility differential.
 - Hypothetical 2024 Electoral College (538 EV preserved): biggest losers **CA −30, NY −13, FL −13, MA −5, SC −4**; biggest gainers **IN +16, OH +11, MO +10, KY +9, TN +8**.
 
 These figures use the cited per-decade foreign-born:native fertility differential

@@ -62,9 +62,9 @@ asserted for non-cited years.
 native differential, but the model applies them to the whole immigrant-descended
 (non-qualifying) lineage each decade. Because later immigrant generations converge
 to native fertility, this is an upper bound on fertility-driven dilution. It is
-adopted as the central case because, with it on, the model's nonblack mass share
-(~31% pre-1870) matches the Manhattan Institute's independent cohort-component
-estimate (~31% pre-1860); turning it off (`old_stock`/`nonqualifying` constants)
+adopted as the central case because it uses the cited per-decade native-vs-immigrant
+fertility differential (`data/fertility_by_nativity.csv`) rather than the unsourced
+fallback constants; turning it off (`old_stock`/`nonqualifying` constants)
 raises the national majority share from ~20% to ~35%.
 
 ## State agent-based model
