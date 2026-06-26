@@ -176,7 +176,7 @@ def fig_raw_headcount(years, populations, pct_majority, pct_not, raw_majority, r
     ax.set_xlim(1865, 2030)
     ax.set_ylim(0, max(pop_m) * 1.08)
     ax.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f"{x:.0f}M"))
-    ax.set_xlabel("Census Year")
+    ax.set_xlabel("Year")
     ax.set_ylabel("Population (millions)")
     ax.set_title('U.S. Population by White "Heritage American" Ancestry Status, 1870–2020',
                  fontweight="bold", pad=14)
